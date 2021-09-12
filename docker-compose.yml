@@ -1,0 +1,42 @@
+---
+version: '3'
+services:
+  # Common settings for other services. You can inherit this by using:
+  #   <<: *common
+  x-common: &common
+    image: docker.artifactory.autozone.com/release/store-operations/el7-build:kafka.2021.03.15
+    working_dir: /workspace
+    volumes:
+      - "./:/workspace"
+
+  client:
+    <<: *common
+    stdin_open: true
+    tty: true
+    entrypoint:
+      - /bin/bash
+      - -c
+      - |
+        ./zbus-cli-ent.x
+
+  shell:
+    <<: *common
+    stdin_open: true
+    tty: true
+    entrypoint: /bin/bash
+
+  build:
+    <<: *common
+    entrypoint:
+      - /bin/bash
+      - -c
+      - |
+        qmake-qt5 && make -j $$(nproc)
+
+  clean:
+    <<: *common
+    entrypoint:
+      - /bin/bash
+      - -c
+      - |
+        make distclean
