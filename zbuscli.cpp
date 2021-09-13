@@ -7,7 +7,7 @@
 class ZBusCliPrivate
 {
 public:
-  QList<ZBusEvent> zBusEventList;
+  QList<ZBusEvent> eventHistory;
 };
 
 ZBusCli::ZBusCli(QObject *parent) : QObject(parent)
@@ -30,15 +30,9 @@ void ZBusCli::onDisconnected() const
   qDebug() << "disonnected from zBus";
 }
 
-// TODO: delete
-void ZBusCli::onTextMessageReceived(const QString &message)
-{
-  qDebug() << "received: " << message;
-}
-
 void ZBusCli::onZBusEventReceived(const ZBusEvent &event)
 {
-  p->zBusEventList.append(event);
+  p->eventHistory.append(event);
   qDebug() << "received: " << event.toJson();
 }
 

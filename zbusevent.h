@@ -1,7 +1,7 @@
 #ifndef ZBUS_EVENT_H
 #define ZBUS_EVENT_H
 
-#include <QJsonObject>
+#include <QJsonValue>
 #include <QString>
 
 class ZBusEvent
@@ -12,8 +12,8 @@ public:
   QString toJson() const;
 
   QString sender;
-  QString event;
-  QJsonObject data;
+  QString type;
+  QJsonValue data;
 };
 
 #endif

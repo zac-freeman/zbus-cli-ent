@@ -19,7 +19,6 @@ public:
 public slots:
   void onConnected() const;
   void onDisconnected() const;
-  void onTextMessageReceived(const QString &message);
   void onZBusEventReceived(const ZBusEvent &event);
   void onError(QAbstractSocket::SocketError error) const;
 

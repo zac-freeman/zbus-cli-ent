@@ -18,7 +18,11 @@ public:
   qint64 sendZBusEvent(const ZBusEvent &event);
 
 signals:
-  void receivedZBusEvent(const ZBusEvent &event);
+  void processedEventQueue();
+  void zBusEventReceived(const ZBusEvent &event);
+
+private slots:
+  void processEventQueue();
 
 private:
   ZWebSocketPrivate *p;
