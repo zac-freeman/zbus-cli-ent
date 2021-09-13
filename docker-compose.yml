@@ -14,10 +14,7 @@ services:
     stdin_open: true
     tty: true
     entrypoint:
-      - /bin/bash
-      - -c
-      - |
-        ./zbus-cli-ent.x
+      - ./zbus-cli-ent.x
 
   shell:
     <<: *common
