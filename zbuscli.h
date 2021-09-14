@@ -16,7 +16,10 @@ public:
   ZBusCli(QObject *parent = nullptr);
   ~ZBusCli();
 
-public slots:
+  void exec();
+  void quit();
+
+private slots:
   void onConnected() const;
   void onDisconnected() const;
   void onZBusEventReceived(const ZBusEvent &event);

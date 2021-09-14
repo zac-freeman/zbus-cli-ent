@@ -1,4 +1,5 @@
 // TODO: add unit tests, add test and explanation for setting origin
+// TODO: add README
 #include "zbuscli.h"
 #include "zbusevent.h"
 #include "zwebsocket.h"
@@ -25,10 +26,9 @@ int main(int argc, char **argv)
   parser.addOption({{"s", "send"},
                     QCoreApplication::translate("main", "send json-formatted zBus <event>"),
                     QCoreApplication::translate("main", "event")});
+  // TODO: interactive mode flag
 
   parser.process(app);
-
-  ZWebSocket zBusClient("http://localhost"); //zBus tries to ensure that clients are local
 
   signal(SIGINT, handleSignal);
   signal(SIGTERM, handleSignal);
@@ -36,29 +36,22 @@ int main(int argc, char **argv)
   // TODO: dont parse commas as separator
   // TODO: send multiple events
   // TODO: interactive mode w/ event sending
+  // TODO: retry logic
   if (parser.isSet("send"))
   {
+      ZWebSocket zBusClient("http://localhost"); //zBus tries to ensure that clients are local
       QObject::connect(&zBusClient, &ZWebSocket::processedEventQueue,
                        &app, &QCoreApplication::quit);
       zBusClient.open(QUrl("ws://192.168.0.157:8180"));
       zBusClient.sendZBusEvent(ZBusEvent(parser.value("send")));
       return app.exec();
+  } else {
+      ZBusCli zBusCli;
+      QObject::connect(&app, &QCoreApplication::aboutToQuit,
+                       &zBusCli, &ZBusCli::quit);
+      zBusCli.exec();
+      return app.exec();
   }
-
-  ZBusCli zBusCli;
-
-  QObject::connect(&zBusClient, &ZWebSocket::connected,
-                   &zBusCli, &ZBusCli::onConnected);
-  QObject::connect(&zBusClient, &ZWebSocket::disconnected,
-                   &zBusCli, &ZBusCli::onDisconnected);
-  QObject::connect(&zBusClient, &ZWebSocket::zBusEventReceived,
-                   &zBusCli, &ZBusCli::onZBusEventReceived);
-  QObject::connect(&zBusClient, SIGNAL(error(QAbstractSocket::SocketError)),
-                   &zBusCli, SLOT(onError(QAbstractSocket::SocketError)));
-
-  zBusClient.open(QUrl("ws://192.168.0.157:8180"));
-
-  return app.exec();
 }
 
 // TODO: proper signal handling

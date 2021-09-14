@@ -2,6 +2,7 @@ TEMPLATE = app
 CONFIG += warn_all console
 QT += core websockets
 QT -= gui
+LIBS += -lncurses
 
 TARGET = zbus-cli-ent.x
 
