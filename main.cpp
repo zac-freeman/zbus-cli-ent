@@ -37,6 +37,7 @@ int main(int argc, char **argv)
   // TODO: send multiple events
   // TODO: interactive mode w/ event sending
   // TODO: retry logic
+  // TODO: proper ncurses cleanup when exiting
   if (parser.isSet("send"))
   {
       ZWebSocket zBusClient("http://localhost"); //zBus tries to ensure that clients are local
