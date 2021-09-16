@@ -4,7 +4,6 @@
 #include "zwebsocket.h"
 
 #include <ncurses.h>
-#include <QDebug>
 
 class ZBusCliPrivate
 {
@@ -35,6 +34,7 @@ ZBusCli::ZBusCli(QObject *parent) : QObject(parent)
 
 ZBusCli::~ZBusCli()
 {
+  endwin();
   delete p;
 }
 
@@ -77,11 +77,6 @@ void ZBusCli::exec()
 
   // connect client to zBus server
   p->client.open(QUrl("ws://192.168.0.157:8180"));
-}
-
-void ZBusCli::quit()
-{
-  endwin();
 }
 
 // TODO: add color

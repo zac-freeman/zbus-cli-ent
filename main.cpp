@@ -30,9 +30,6 @@ int main(int argc, char **argv)
 
   parser.process(app);
 
-  signal(SIGINT, handleSignal);
-  signal(SIGTERM, handleSignal);
-
   // TODO: dont parse commas as separator
   // TODO: send multiple events
   // TODO: interactive mode w/ event sending
@@ -48,18 +45,7 @@ int main(int argc, char **argv)
       return app.exec();
   } else {
       ZBusCli zBusCli;
-      QObject::connect(&app, &QCoreApplication::aboutToQuit,
-                       &zBusCli, &ZBusCli::quit);
       zBusCli.exec();
       return app.exec();
-  }
-}
-
-// TODO: proper signal handling
-void handleSignal(int signum)
-{
-  if (signum == SIGINT || signum == SIGTERM)
-  {
-    exit(0);
   }
 }
