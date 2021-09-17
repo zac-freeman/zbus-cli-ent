@@ -3,23 +3,33 @@
 #include "zbusevent.h"
 #include "zwebsocket.h"
 
+#include <form.h>
 #include <ncurses.h>
+#include <thread>
 
 class ZBusCliPrivate
 {
 public:
+  ZBusCliPrivate(ZBusCli *parent) : receiver(&ZBusCli::handleInput, parent) {}
+
   QList<ZBusEvent> eventHistory;
   ZWebSocket client{"http://localhost"}; //zBus tries to ensure that clients are local
+  std::thread receiver;
+
   WINDOW *helpWindow;
   WINDOW *entryWindow;
+  WINDOW *entrySubwindow;
   WINDOW *statusWindow;
   WINDOW *historyWindow;
+
+  FIELD *entryFields[2];
+  FORM *entryForm;
 };
 
 // TODO: send events through CLI
 ZBusCli::ZBusCli(QObject *parent) : QObject(parent)
 {
-  p = new ZBusCliPrivate();
+  p = new ZBusCliPrivate(this);
 
   connect(&p->client, &ZWebSocket::connected,
           this, &ZBusCli::onConnected);
@@ -29,11 +39,20 @@ ZBusCli::ZBusCli(QObject *parent) : QObject(parent)
           this, &ZBusCli::onZBusEventReceived);
   connect(&p->client, SIGNAL(error(QAbstractSocket::SocketError)),
           this, SLOT(onError(QAbstractSocket::SocketError)));
-
 }
 
 ZBusCli::~ZBusCli()
 {
+  delwin(p->helpWindow);
+  delwin(p->entryWindow);
+  delwin(p->entrySubwindow);
+  delwin(p->statusWindow);
+  delwin(p->historyWindow);
+
+  free_form(p->entryForm);
+  free_field(p->entryFields[0]);
+  free_field(p->entryFields[1]);
+
   endwin();
   delete p;
 }
@@ -66,10 +85,31 @@ void ZBusCli::exec()
   int statusX = screenColumns - statusColumns;
   p->statusWindow = newwin(statusRows, statusColumns, statusY, statusX);
 
-  // TODO: event entry form
+  // create event entry form
+  int fieldWidth = screenColumns / 4;
+  p->entryFields[0] = new_field(1, fieldWidth - 1, 0, 0, 0, 0);
+  set_field_back(p->entryFields[0], A_UNDERLINE);
+  field_opts_off(p->entryFields[0], O_AUTOSKIP);
+
+  p->entryFields[1] = new_field(5, 3 * fieldWidth - 1, 0, fieldWidth, 0, 0);
+  set_field_back(p->entryFields[1], A_UNDERLINE);
+  field_opts_off(p->entryFields[1], O_AUTOSKIP);
+
+  p->entryForm = new_form(p->entryFields);
+
+  int entryRows = 5;
+  int entryColumns = screenColumns;
+  int entryY = statusY + statusRows + 1;
+  int entryX = screenColumns - entryColumns;
+  p->entryWindow = newwin(entryRows, entryColumns, entryY, entryX);
+  p->entrySubwindow = derwin(p->entryWindow, entryRows, entryColumns, 0, 0);
+  set_form_win(p->entryForm, p->entryWindow);
+  set_form_sub(p->entryForm, p->entrySubwindow);
+  post_form(p->entryForm);
+  wrefresh(p->entryWindow);
 
   // create window for event history, using the remaining rows in the screen
-  int historyRows = screenRows - (statusY + statusRows + 1);
+  int historyRows = screenRows - (entryY + entryRows + 1);
   int historyColumns = screenColumns;
   int historyY = screenRows - historyRows;
   int historyX = screenColumns - historyColumns;
@@ -77,6 +117,19 @@ void ZBusCli::exec()
 
   // connect client to zBus server
   p->client.open(QUrl("ws://192.168.0.157:8180"));
+
+  // wait for input in another thread
+  p->receiver.detach();
+}
+
+void ZBusCli::handleInput()
+{
+  while (true)
+  {
+    char input = wgetch(p->entryWindow);
+    form_driver(p->entryForm, input);
+    wrefresh(p->entryWindow);
+  }
 }
 
 // TODO: add color
