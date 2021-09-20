@@ -120,6 +120,7 @@ void ZBusCli::run()
   wmove(p->entryWindow, 2, 0);
   wprintw(p->entryWindow, "data");
   wrefresh(p->entryWindow);
+  form_driver(p->entryForm, REQ_END_LINE);
 
   // create window for event history, using the remaining rows in the screen
   int historyRows = screenRows - (entryY + entryRows + 1);
@@ -128,7 +129,7 @@ void ZBusCli::run()
   int historyX = screenColumns - historyColumns;
   p->historyWindow = newwin(historyRows, historyColumns, historyY, historyX);
 
-  // capture input and update display every second
+  // capture input and update display
   while (true)
   {
     char input = wgetch(p->entryWindow);
@@ -205,6 +206,8 @@ void ZBusCli::run()
         // update screen
         wrefresh(p->historyWindow);
     }
+
+    // TODO: return cursor to previous position in entry form
   }
 }
 
