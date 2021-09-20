@@ -6,7 +6,6 @@
 #include <form.h>
 #include <ncurses.h>
 #include <thread>
-#include <QDebug>
 
 class ZBusCliPrivate
 {
