@@ -228,36 +228,7 @@ qint64 ZBusCli::send(const QString &event, const QString &data)
   return p->client.sendZBusEvent(ZBusEvent(event.trimmed(), data.trimmed()));
 }
 
-// TODO: add color
-void ZBusCli::onConnected() const
-{
-  wmove(p->statusWindow, 0, 0);
-  wclear(p->statusWindow);
-  wprintw(p->statusWindow, "status: connected to zBus");
-  wrefresh(p->statusWindow);
-}
-
-// TODO: add color
-void ZBusCli::onDisconnected() const
-{
-  wmove(p->statusWindow, 0, 0);
-  clrtoeol();
-  wprintw(p->statusWindow, "status: disconnected from zBus");
-  wrefresh(p->statusWindow);
-}
-
 void ZBusCli::onZBusEventReceived(const ZBusEvent &event)
 {
   p->eventHistory.append(event);
-}
-
-// TODO: add color
-void ZBusCli::onError(QAbstractSocket::SocketError error) const
-{
-  Q_UNUSED(error);
-  wmove(p->statusWindow, 1, 0);
-  clrtoeol();
-  wprintw(p->statusWindow, "error: ");
-  wprintw(p->statusWindow, p->client.errorString().toUtf8().data());
-  wrefresh(p->statusWindow);
 }

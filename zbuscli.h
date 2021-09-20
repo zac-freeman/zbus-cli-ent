@@ -24,10 +24,7 @@ signals:
   void enterPressed(const QString &event, const QString &data);
 
 private slots:
-  void onConnected() const;
-  void onDisconnected() const;
   void onZBusEventReceived(const ZBusEvent &event);
-  void onError(QAbstractSocket::SocketError error) const;
 
 private:
   ZBusCliPrivate *p;
