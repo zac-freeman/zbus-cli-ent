@@ -17,7 +17,7 @@ public:
   ~ZBusCli();
 
   void exec();
-  void handleInput();
+  void run();
 
 private slots:
   void onConnected() const;

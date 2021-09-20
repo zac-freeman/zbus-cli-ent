@@ -10,8 +10,9 @@
 class ZBusCliPrivate
 {
 public:
-  ZBusCliPrivate(ZBusCli *parent) : receiver(&ZBusCli::handleInput, parent) {}
+  ZBusCliPrivate(ZBusCli *parent) : receiver(&ZBusCli::run, parent) {}
 
+  int previousSize = 0;
   QList<ZBusEvent> eventHistory;
   ZWebSocket client{"http://localhost"}; //zBus tries to ensure that clients are local
   std::thread receiver;
@@ -31,14 +32,8 @@ ZBusCli::ZBusCli(QObject *parent) : QObject(parent)
 {
   p = new ZBusCliPrivate(this);
 
-  connect(&p->client, &ZWebSocket::connected,
-          this, &ZBusCli::onConnected);
-  connect(&p->client, &ZWebSocket::disconnected,
-          this, &ZBusCli::onDisconnected);
   connect(&p->client, &ZWebSocket::zBusEventReceived,
           this, &ZBusCli::onZBusEventReceived);
-  connect(&p->client, SIGNAL(error(QAbstractSocket::SocketError)),
-          this, SLOT(onError(QAbstractSocket::SocketError)));
 }
 
 ZBusCli::~ZBusCli()
@@ -59,10 +54,21 @@ ZBusCli::~ZBusCli()
 
 void ZBusCli::exec()
 {
+  // connect client to zBus server
+  p->client.open(QUrl("ws://10.0.0.40:8180"));
+
+  // wait for input in another thread
+  p->receiver.detach();
+}
+
+void ZBusCli::run()
+{
   // start curses mode with character echoing and line buffering disabled
   initscr();
+  keypad(stdscr, true);
   noecho();
   cbreak();
+  halfdelay(10);
 
   // get width and height of screen
   int screenRows, screenColumns;
@@ -75,7 +81,7 @@ void ZBusCli::exec()
   int helpX = screenColumns - helpColumns;
   p->helpWindow = newwin(helpRows, helpColumns, helpY, helpX);
   wmove(p->helpWindow, 0, 0);
-  wprintw(p->helpWindow, "Esc) exit"); // TODO: make this true
+  wprintw(p->helpWindow, "Esc) exit program  Tab) move cursor to next field"); // TODO: make this true
   wrefresh(p->helpWindow);
 
   // create window to display connection status with zBus
@@ -86,18 +92,21 @@ void ZBusCli::exec()
   p->statusWindow = newwin(statusRows, statusColumns, statusY, statusX);
 
   // create event entry form
-  int fieldWidth = screenColumns / 4;
-  p->entryFields[0] = new_field(1, fieldWidth - 1, 0, 0, 0, 0);
+  p->entryFields[0] = new_field(1, screenColumns - 6, 0, 6, 0, 0);
   set_field_back(p->entryFields[0], A_UNDERLINE);
   field_opts_off(p->entryFields[0], O_AUTOSKIP);
+  field_opts_off(p->entryFields[0], O_STATIC);
+  field_opts_off(p->entryFields[0], O_BLANK);
 
-  p->entryFields[1] = new_field(5, 3 * fieldWidth - 1, 0, fieldWidth, 0, 0);
+  p->entryFields[1] = new_field(5, screenColumns - 5, 2, 5, 0, 0);
   set_field_back(p->entryFields[1], A_UNDERLINE);
   field_opts_off(p->entryFields[1], O_AUTOSKIP);
+  field_opts_off(p->entryFields[1], O_STATIC);
+  field_opts_off(p->entryFields[1], O_BLANK);
 
   p->entryForm = new_form(p->entryFields);
 
-  int entryRows = 5;
+  int entryRows = 7;
   int entryColumns = screenColumns;
   int entryY = statusY + statusRows + 1;
   int entryX = screenColumns - entryColumns;
@@ -106,6 +115,10 @@ void ZBusCli::exec()
   set_form_win(p->entryForm, p->entryWindow);
   set_form_sub(p->entryForm, p->entrySubwindow);
   post_form(p->entryForm);
+  wmove(p->entryWindow, 0, 0);
+  wprintw(p->entryWindow, "event");
+  wmove(p->entryWindow, 2, 0);
+  wprintw(p->entryWindow, "data");
   wrefresh(p->entryWindow);
 
   // create window for event history, using the remaining rows in the screen
@@ -115,20 +128,83 @@ void ZBusCli::exec()
   int historyX = screenColumns - historyColumns;
   p->historyWindow = newwin(historyRows, historyColumns, historyY, historyX);
 
-  // connect client to zBus server
-  p->client.open(QUrl("ws://192.168.0.157:8180"));
-
-  // wait for input in another thread
-  p->receiver.detach();
-}
-
-void ZBusCli::handleInput()
-{
+  // capture input and update display every second
   while (true)
   {
     char input = wgetch(p->entryWindow);
-    form_driver(p->entryForm, input);
-    wrefresh(p->entryWindow);
+    switch(input)
+    {
+        case ERR:
+            break;
+        case 127:
+            form_driver(p->entryForm, REQ_DEL_PREV);
+            break;
+        case '\t':
+            form_driver(p->entryForm, REQ_NEXT_FIELD);
+            form_driver(p->entryForm, REQ_END_LINE);
+            break;
+        default:
+            form_driver(p->entryForm, input);
+    }
+
+    if (p->client.isValid())
+    {
+        wmove(p->statusWindow, 0, 0);
+        wclear(p->statusWindow);
+        wprintw(p->statusWindow, "status: connected to zBus");
+        wrefresh(p->statusWindow);
+    } else {
+        wmove(p->statusWindow, 0, 0);
+        clrtoeol();
+        wprintw(p->statusWindow, "status: disconnected from zBus");
+        wrefresh(p->statusWindow);
+    }
+
+    if (p->client.error() != QAbstractSocket::UnknownSocketError)
+    {
+        wmove(p->statusWindow, 1, 0);
+        clrtoeol();
+        wprintw(p->statusWindow, "error: ");
+        wprintw(p->statusWindow, p->client.errorString().toUtf8().data());
+        wrefresh(p->statusWindow);
+    }
+
+    if (p->eventHistory.size() > p->previousSize)
+    {
+        p->previousSize = p->eventHistory.size();
+
+        // clear event history
+        wclear(p->historyWindow);
+
+        // get width and height of window
+        int rows, columns;
+        getmaxyx(p->historyWindow, rows, columns);
+
+        // write events until running out of events or screen space
+        int row = 0;
+        int size = p->eventHistory.size();
+        for (int i = size - 1; i >= 0; i--)
+        {
+            // determine the height (due to line-wrapping) of the next event to be written;
+            // if the event would extend past the end of the historyWindow,
+            // do not display that event or any subsequent events
+            QString json = p->eventHistory.at(i).toJson();
+            int height = ((json.size() - 1) / columns) + 1;
+            if (row + height > rows) {
+                break;
+            }
+
+            // move to next row, and write event to line
+            wmove(p->historyWindow, row, 0);
+            wprintw(p->historyWindow, json.toUtf8().data());
+
+            // set row for next event immediately after current event
+            row = row + height;
+        }
+
+        // update screen
+        wrefresh(p->historyWindow);
+    }
   }
 }
 
@@ -153,38 +229,6 @@ void ZBusCli::onDisconnected() const
 void ZBusCli::onZBusEventReceived(const ZBusEvent &event)
 {
   p->eventHistory.append(event);
-
-  // clear event history
-  wclear(p->historyWindow);
-
-  // get width and height of window
-  int rows, columns;
-  getmaxyx(p->historyWindow, rows, columns);
-
-  // write events until running out of events or screen space
-  int row = 0;
-  int size = p->eventHistory.size();
-  for (int i = size - 1; i >= 0; i--)
-  {
-      // determine the height (due to line-wrapping) of the next event to be written;
-      // if the event would extend past the end of the historyWindow,
-      // do not display that event or any subsequent events
-      QString json = p->eventHistory.at(i).toJson();
-      int height = ((json.size() - 1) / columns) + 1;
-      if (row + height > rows) {
-          break;
-      }
-
-      // move to next row, and write event to line
-      wmove(p->historyWindow, row, 0);
-      wprintw(p->historyWindow, json.toUtf8().data());
-
-      // set row for next event immediately after current event
-      row = row + height;
-  }
-
-  // update screen
-  wrefresh(p->historyWindow);
 }
 
 // TODO: add color
