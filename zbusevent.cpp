@@ -15,6 +15,14 @@ ZBusEvent::ZBusEvent(const QString &event)
   this->data = json.value("data");
 }
 
+ZBusEvent::ZBusEvent(const QString &event, const QString &data)
+{
+  QStringList senderAndType = event.split(".");
+  this->sender = senderAndType.value(0);
+  this->type = senderAndType.value(1);
+  this->data = data;
+}
+
 QString ZBusEvent::toJson() const
 {
   QJsonObject json{{"event", sender + (type.isEmpty() ? "" : ".") + type},

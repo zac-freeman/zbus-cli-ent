@@ -40,7 +40,7 @@ int main(int argc, char **argv)
       ZWebSocket zBusClient("http://localhost"); //zBus tries to ensure that clients are local
       QObject::connect(&zBusClient, &ZWebSocket::processedEventQueue,
                        &app, &QCoreApplication::quit);
-      zBusClient.open(QUrl("ws://192.168.0.157:8180"));
+      zBusClient.open(QUrl("ws://10.0.0.40:8180"));
       zBusClient.sendZBusEvent(ZBusEvent(parser.value("send")));
       return app.exec();
   } else {

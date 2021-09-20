@@ -18,6 +18,10 @@ public:
 
   void exec();
   void run();
+  qint64 send(const QString &event, const QString &data);
+
+signals:
+  void enterPressed(const QString &event, const QString &data);
 
 private slots:
   void onConnected() const;

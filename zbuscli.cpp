@@ -6,6 +6,7 @@
 #include <form.h>
 #include <ncurses.h>
 #include <thread>
+#include <QDebug>
 
 class ZBusCliPrivate
 {
@@ -34,6 +35,8 @@ ZBusCli::ZBusCli(QObject *parent) : QObject(parent)
 
   connect(&p->client, &ZWebSocket::zBusEventReceived,
           this, &ZBusCli::onZBusEventReceived);
+  connect(this, &ZBusCli::enterPressed,
+          this, &ZBusCli::send);
 }
 
 ZBusCli::~ZBusCli()
@@ -68,6 +71,7 @@ void ZBusCli::run()
   keypad(stdscr, true);
   noecho();
   cbreak();
+  nonl();
   halfdelay(10);
 
   // get width and height of screen
@@ -138,11 +142,19 @@ void ZBusCli::run()
         case ERR:
             break;
         case 127:
+        case KEY_BACKSPACE:
             form_driver(p->entryForm, REQ_DEL_PREV);
             break;
         case '\t':
+        case KEY_STAB:
             form_driver(p->entryForm, REQ_NEXT_FIELD);
             form_driver(p->entryForm, REQ_END_LINE);
+            break;
+        case '\r':
+        case '\n':
+        case KEY_ENTER:
+            form_driver(p->entryForm, REQ_VALIDATION);
+            emit enterPressed(field_buffer(p->entryFields[0], 0), field_buffer(p->entryFields[1], 0));
             break;
         default:
             form_driver(p->entryForm, input);
@@ -209,6 +221,11 @@ void ZBusCli::run()
 
     // TODO: return cursor to previous position in entry form
   }
+}
+
+qint64 ZBusCli::send(const QString &event, const QString &data)
+{
+  return p->client.sendZBusEvent(ZBusEvent(event.trimmed(), data.trimmed()));
 }
 
 // TODO: add color
