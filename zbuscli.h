@@ -1,8 +1,8 @@
 #ifndef ZBUS_CLI_H
 #define ZBUS_CLI_H
 
-#include <QObject>
 #include <QAbstractSocket>
+#include <QObject>
 
 class ZBusEvent;
 class ZBusCliPrivate;
@@ -17,16 +17,17 @@ public:
   ~ZBusCli();
 
   void exec();
-  void run();
-  qint64 send(const QString &event, const QString &data);
 
 signals:
-  void enterPressed(const QString &event, const QString &data);
+  void eventSubmitted(const QString &event, const QString &data);
 
 private slots:
+  qint64 onEventSubmitted(const QString &event, const QString &data);
   void onZBusEventReceived(const ZBusEvent &event);
 
 private:
+  void ncurses();
+
   ZBusCliPrivate *p;
 };
 

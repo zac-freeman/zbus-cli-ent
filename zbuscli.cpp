@@ -38,8 +38,8 @@ ZBusCli::ZBusCli(QObject *parent) : QObject(parent)
 
   connect(&p->client, &ZWebSocket::zBusEventReceived,
           this, &ZBusCli::onZBusEventReceived);
-  connect(this, &ZBusCli::enterPressed,
-          this, &ZBusCli::send);
+  connect(this, &ZBusCli::eventSubmitted,
+          this, &ZBusCli::onEventSubmitted);
 }
 
 ZBusCli::~ZBusCli()
@@ -64,10 +64,10 @@ void ZBusCli::exec()
   p->client.open(QUrl("ws://10.0.0.40:8180"));
 
   // wait for input in another thread
-  QtConcurrent::run(this, &ZBusCli::run);
+  QtConcurrent::run(this, &ZBusCli::ncurses);
 }
 
-void ZBusCli::run()
+void ZBusCli::ncurses()
 {
   // start curses mode with character echoing and line buffering disabled
   initscr();
@@ -172,7 +172,7 @@ void ZBusCli::run()
         case '\n':
         case KEY_ENTER:
             form_driver(p->entryForm, REQ_VALIDATION);
-            emit enterPressed(field_buffer(p->entryFields[0], 0), field_buffer(p->entryFields[1], 0));
+            emit eventSubmitted(field_buffer(p->entryFields[0], 0), field_buffer(p->entryFields[1], 0));
             break;
         case 127:
         case KEY_BACKSPACE:
@@ -243,7 +243,7 @@ void ZBusCli::run()
   }
 }
 
-qint64 ZBusCli::send(const QString &event, const QString &data)
+qint64 ZBusCli::onEventSubmitted(const QString &event, const QString &data)
 {
   return p->client.sendZBusEvent(ZBusEvent(event.trimmed(), data.trimmed()));
 }
