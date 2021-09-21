@@ -12,7 +12,11 @@ class ZWebSocket : public QWebSocket
   Q_DISABLE_COPY(ZWebSocket)
 
 public:
-  ZWebSocket(const QString &origin = QString(), QWebSocketProtocol::Version version = QWebSocketProtocol::VersionLatest, QObject *parent = nullptr);
+  /* zBus checks that incoming requests have an origin header that contains "http://localhost", so
+   * ZWebSocket is set to send requests with an origin header that contains "http://localhost", by
+   * default
+   */
+  ZWebSocket(const QString &origin = "http://localhost", QWebSocketProtocol::Version version = QWebSocketProtocol::VersionLatest, QObject *parent = nullptr);
   ~ZWebSocket();
 
   qint64 sendZBusEvent(const ZBusEvent &event);

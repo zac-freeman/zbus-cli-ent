@@ -26,18 +26,15 @@ int main(int argc, char **argv)
   parser.addOption({{"s", "send"},
                     QCoreApplication::translate("main", "send json-formatted zBus <event>"),
                     QCoreApplication::translate("main", "event")});
-  // TODO: interactive mode flag
 
   parser.process(app);
 
   // TODO: dont parse commas as separator
   // TODO: send multiple events
-  // TODO: interactive mode w/ event sending
   // TODO: retry logic
-  // TODO: proper ncurses cleanup when exiting
   if (parser.isSet("send"))
   {
-      ZWebSocket zBusClient("http://localhost"); //zBus tries to ensure that clients are local
+      ZWebSocket zBusClient;
       QObject::connect(&zBusClient, &ZWebSocket::processedEventQueue,
                        &app, &QCoreApplication::quit);
       zBusClient.open(QUrl("ws://10.0.0.40:8180"));

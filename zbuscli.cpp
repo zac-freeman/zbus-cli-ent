@@ -14,10 +14,7 @@
 class ZBusCliPrivate
 {
 public:
-  /* zBus checks that incoming requests have an origin header that contains "http://localhost", so
-   * ZWebSocket is set to send requests with an origin header that contains "http://localhost".
-   */
-  ZBusCliPrivate() : client("http://localhost") {}
+  ZBusCliPrivate() {}
 
   QList<ZBusEvent> eventHistory;
   ZWebSocket client;
