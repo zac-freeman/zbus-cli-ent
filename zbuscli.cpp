@@ -82,13 +82,14 @@ void ZBusCli::run()
   getmaxyx(stdscr, screenRows, screenColumns);
 
   // create window to display keybinds
+  QString helpText = "Ctrl+C) exit program  Tab) switch field  Enter) send event";
   int helpRows = 1;
   int helpColumns = screenColumns;
   int helpY = 0;
   int helpX = screenColumns - helpColumns;
   p->helpWindow = newwin(helpRows, helpColumns, helpY, helpX);
   wmove(p->helpWindow, 0, 0);
-  wprintw(p->helpWindow, "Esc) exit program  Tab) move cursor to next field");
+  wprintw(p->helpWindow, helpText.toUtf8().data());
   wrefresh(p->helpWindow);
 
   // create window to display connection status with zBus
@@ -162,10 +163,6 @@ void ZBusCli::run()
     {
         case ERR:
             break;
-        case 127:
-        case KEY_BACKSPACE:
-            form_driver(p->entryForm, REQ_DEL_PREV);
-            break;
         case '\t':
         case KEY_STAB:
             form_driver(p->entryForm, REQ_NEXT_FIELD);
@@ -176,6 +173,10 @@ void ZBusCli::run()
         case KEY_ENTER:
             form_driver(p->entryForm, REQ_VALIDATION);
             emit enterPressed(field_buffer(p->entryFields[0], 0), field_buffer(p->entryFields[1], 0));
+            break;
+        case 127:
+        case KEY_BACKSPACE:
+            form_driver(p->entryForm, REQ_DEL_PREV);
             break;
         default:
             form_driver(p->entryForm, input);
