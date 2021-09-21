@@ -190,7 +190,7 @@ void ZBusCli::ncurses()
         wrefresh(p->statusWindow);
     } else {
         wmove(p->statusWindow, 0, 0);
-        clrtoeol();
+        wclrtoeol(p->statusWindow);
         wprintw(p->statusWindow, "status: disconnected from zBus");
         wrefresh(p->statusWindow);
     }
@@ -198,7 +198,7 @@ void ZBusCli::ncurses()
     if (p->client.error() != QAbstractSocket::UnknownSocketError)
     {
         wmove(p->statusWindow, 1, 0);
-        clrtoeol();
+        wclrtoeol(p->statusWindow);
         wprintw(p->statusWindow, "error: ");
         wprintw(p->statusWindow, p->client.errorString().toUtf8().data());
         wrefresh(p->statusWindow);
