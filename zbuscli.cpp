@@ -32,7 +32,6 @@ public:
   FORM *entryForm;
 };
 
-// TODO: send events through CLI
 ZBusCli::ZBusCli(QObject *parent) : QObject(parent)
 {
   p = new ZBusCliPrivate();
@@ -89,7 +88,7 @@ void ZBusCli::run()
   int helpX = screenColumns - helpColumns;
   p->helpWindow = newwin(helpRows, helpColumns, helpY, helpX);
   wmove(p->helpWindow, 0, 0);
-  wprintw(p->helpWindow, "Esc) exit program  Tab) move cursor to next field"); // TODO: make this true
+  wprintw(p->helpWindow, "Esc) exit program  Tab) move cursor to next field");
   wrefresh(p->helpWindow);
 
   // create window to display connection status with zBus
@@ -240,8 +239,6 @@ void ZBusCli::run()
         // update screen
         wrefresh(p->historyWindow);
     }
-
-    // TODO: return cursor to previous position in entry form
   }
 }
 
