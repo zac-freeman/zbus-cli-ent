@@ -5,6 +5,7 @@
 
 // Qt libraries MUST be imported before ncurses libraries.
 // Somewhere in the depths of ncurses, there is a macro that redefines `timeout` globally.
+#include <QTimer>
 #include <QtConcurrent>
 
 // ncurses libraries
@@ -33,10 +34,12 @@ ZBusCli::ZBusCli(QObject *parent) : QObject(parent)
 {
   p = new ZBusCliPrivate();
 
-  connect(&p->client, &ZWebSocket::zBusEventReceived,
-          this, &ZBusCli::onZBusEventReceived);
+  connect(&p->client, &ZWebSocket::disconnected,
+          this, &ZBusCli::onDisconnected);
   connect(this, &ZBusCli::eventSubmitted,
           this, &ZBusCli::onEventSubmitted);
+  connect(&p->client, &ZWebSocket::zBusEventReceived,
+          this, &ZBusCli::onZBusEventReceived);
 }
 
 ZBusCli::~ZBusCli()
@@ -238,6 +241,11 @@ void ZBusCli::ncurses()
         wrefresh(p->historyWindow);
     }
   }
+}
+
+void ZBusCli::onDisconnected()
+{
+  QTimer::singleShot(1000, [this] {p->client.open(QUrl("ws://10.0.0.40:8180"));});
 }
 
 qint64 ZBusCli::onEventSubmitted(const QString &event, const QString &data)

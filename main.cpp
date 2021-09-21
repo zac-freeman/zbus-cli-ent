@@ -31,7 +31,6 @@ int main(int argc, char **argv)
 
   // TODO: dont parse commas as separator
   // TODO: send multiple events
-  // TODO: retry logic
   if (parser.isSet("send"))
   {
       ZWebSocket zBusClient;

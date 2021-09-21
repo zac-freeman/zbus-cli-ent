@@ -22,6 +22,7 @@ signals:
   void eventSubmitted(const QString &event, const QString &data);
 
 private slots:
+  void onDisconnected();
   qint64 onEventSubmitted(const QString &event, const QString &data);
   void onZBusEventReceived(const ZBusEvent &event);
 
