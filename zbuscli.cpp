@@ -123,23 +123,26 @@ void ZBusCli::run()
   field_opts_off(p->entryFields[1], O_STATIC);
   field_opts_off(p->entryFields[1], O_BLANK);
 
-  p->entryForm = new_form(p->entryFields);
-
+  // create window to contain event entry form
   int entryRows = 7;
   int entryColumns = screenColumns;
   int entryY = statusY + statusRows + 1;
   int entryX = screenColumns - entryColumns;
   p->entryWindow = newwin(entryRows, entryColumns, entryY, entryX);
   p->entrySubwindow = derwin(p->entryWindow, entryRows, entryColumns, 0, 0);
+
+  // create event entry form to contain event entry fields
+  p->entryForm = new_form(p->entryFields);
   set_form_win(p->entryForm, p->entryWindow);
   set_form_sub(p->entryForm, p->entrySubwindow);
   post_form(p->entryForm);
+
+  // add labels for event entry fields
   wmove(p->entryWindow, 0, 0);
   wprintw(p->entryWindow, "event");
   wmove(p->entryWindow, 2, 0);
   wprintw(p->entryWindow, "data");
   wrefresh(p->entryWindow);
-  form_driver(p->entryForm, REQ_END_LINE);
 
   // create window for event history, using the remaining rows in the screen
   int historyRows = screenRows - (entryY + entryRows + 1);
@@ -147,6 +150,9 @@ void ZBusCli::run()
   int historyY = screenRows - historyRows;
   int historyX = screenColumns - historyColumns;
   p->historyWindow = newwin(historyRows, historyColumns, historyY, historyX);
+
+  // move cursor to start of event entry field
+  form_driver(p->entryForm, REQ_END_LINE);
 
   // capture input and update display
   int previousSize = 0;
