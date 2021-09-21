@@ -1,6 +1,6 @@
 TEMPLATE = app
 CONFIG += warn_all console
-QT += core websockets
+QT += concurrent core websockets
 QT -= gui
 LIBS += -lform -lncurses
 

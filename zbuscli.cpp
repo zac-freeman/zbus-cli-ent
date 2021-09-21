@@ -3,24 +3,29 @@
 #include "zbusevent.h"
 #include "zwebsocket.h"
 
+// Qt libraries MUST be imported before ncurses libraries.
+// Somewhere in the depths of ncurses, there is a macro that redefines `timeout` globally.
+#include <QtConcurrent>
+
+// ncurses libraries
 #include <form.h>
 #include <ncurses.h>
-#include <thread>
 
 class ZBusCliPrivate
 {
 public:
-  ZBusCliPrivate(ZBusCli *parent) : receiver(&ZBusCli::run, parent) {}
+  /* zBus checks that incoming requests have an origin header that contain "http://localhost", so
+   * ZWebSocket is set to send requests with an origin header that contain "http://localhost".
+   */
+  ZBusCliPrivate() : client("http://localhost") {}
 
-  int previousSize = 0;
   QList<ZBusEvent> eventHistory;
-  ZWebSocket client{"http://localhost"}; //zBus tries to ensure that clients are local
-  std::thread receiver;
+  ZWebSocket client;
 
   WINDOW *helpWindow;
+  WINDOW *statusWindow;
   WINDOW *entryWindow;
   WINDOW *entrySubwindow;
-  WINDOW *statusWindow;
   WINDOW *historyWindow;
 
   FIELD *entryFields[2];
@@ -30,7 +35,7 @@ public:
 // TODO: send events through CLI
 ZBusCli::ZBusCli(QObject *parent) : QObject(parent)
 {
-  p = new ZBusCliPrivate(this);
+  p = new ZBusCliPrivate();
 
   connect(&p->client, &ZWebSocket::zBusEventReceived,
           this, &ZBusCli::onZBusEventReceived);
@@ -60,7 +65,7 @@ void ZBusCli::exec()
   p->client.open(QUrl("ws://10.0.0.40:8180"));
 
   // wait for input in another thread
-  p->receiver.detach();
+  QtConcurrent::run(this, &ZBusCli::run);
 }
 
 void ZBusCli::run()
@@ -94,14 +99,25 @@ void ZBusCli::run()
   int statusX = screenColumns - statusColumns;
   p->statusWindow = newwin(statusRows, statusColumns, statusY, statusX);
 
-  // create event entry form
-  p->entryFields[0] = new_field(1, screenColumns - 6, 0, 6, 0, 0);
+  // create field for input of event sender and event type
+  QString eventLabel = "event";
+  int eventRows = 1;
+  int eventColumns = screenColumns - (eventLabel.size() + 1);
+  int eventY = 0;
+  int eventX = screenColumns - eventColumns;
+  p->entryFields[0] = new_field(eventRows, eventColumns, eventY, eventX, 0, 0);
   set_field_back(p->entryFields[0], A_UNDERLINE);
   field_opts_off(p->entryFields[0], O_AUTOSKIP);
   field_opts_off(p->entryFields[0], O_STATIC);
   field_opts_off(p->entryFields[0], O_BLANK);
 
-  p->entryFields[1] = new_field(5, screenColumns - 5, 2, 5, 0, 0);
+  // create field for input of event data
+  QString dataLabel = "data";
+  int dataRows = 5;
+  int dataColumns = screenColumns - (dataLabel.size() + 1);
+  int dataY = eventY + eventRows + 1;
+  int dataX = screenColumns - dataColumns;
+  p->entryFields[1] = new_field(dataRows, dataColumns, dataY, dataX, 0, 0);
   set_field_back(p->entryFields[1], A_UNDERLINE);
   field_opts_off(p->entryFields[1], O_AUTOSKIP);
   field_opts_off(p->entryFields[1], O_STATIC);
@@ -133,6 +149,7 @@ void ZBusCli::run()
   p->historyWindow = newwin(historyRows, historyColumns, historyY, historyX);
 
   // capture input and update display
+  int previousSize = 0;
   while (true)
   {
     char input = wgetch(p->entryWindow);
@@ -181,9 +198,9 @@ void ZBusCli::run()
         wrefresh(p->statusWindow);
     }
 
-    if (p->eventHistory.size() > p->previousSize)
+    if (p->eventHistory.size() > previousSize)
     {
-        p->previousSize = p->eventHistory.size();
+        previousSize = p->eventHistory.size();
 
         // clear event history
         wclear(p->historyWindow);
