@@ -67,6 +67,22 @@ void ZBusCli::exec(const QUrl &zBusUrl)
   QtConcurrent::run(this, &ZBusCli::ncurses);
 }
 
+void ZBusCli::onDisconnected()
+{
+  QUrl zBusUrl = p->client.requestUrl();
+  QTimer::singleShot(1000, [this, &zBusUrl] {p->client.open(zBusUrl);});
+}
+
+qint64 ZBusCli::onEventSubmitted(const QString &event, const QString &data)
+{
+  return p->client.sendZBusEvent(ZBusEvent(event.trimmed(), data.trimmed()));
+}
+
+void ZBusCli::onZBusEventReceived(const ZBusEvent &event)
+{
+  p->eventHistory.append(event);
+}
+
 void ZBusCli::ncurses()
 {
   // start curses mode with character echoing and line buffering disabled
@@ -241,20 +257,4 @@ void ZBusCli::ncurses()
         wrefresh(p->historyWindow);
     }
   }
-}
-
-void ZBusCli::onDisconnected()
-{
-  QUrl zBusUrl = p->client.requestUrl();
-  QTimer::singleShot(1000, [this, &zBusUrl] {p->client.open(zBusUrl);});
-}
-
-qint64 ZBusCli::onEventSubmitted(const QString &event, const QString &data)
-{
-  return p->client.sendZBusEvent(ZBusEvent(event.trimmed(), data.trimmed()));
-}
-
-void ZBusCli::onZBusEventReceived(const ZBusEvent &event)
-{
-  p->eventHistory.append(event);
 }

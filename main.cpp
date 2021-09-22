@@ -47,7 +47,6 @@ int main(int argc, char **argv)
       return 1;
   }
 
-  // TODO: send multiple events
   if (parser.isSet("send"))
   {
       // quit application upon receiving signal to quit (e.g. Ctrl+C)
