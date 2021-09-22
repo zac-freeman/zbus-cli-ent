@@ -20,6 +20,8 @@ public:
   ~ZWebSocket();
 
   qint64 sendZBusEvent(const ZBusEvent &event);
+  qint64 sendZBusEvents(const QStringList &events);
+  qint64 sendZBusEvents(const QList<ZBusEvent> &events);
 
 signals:
   void processedEventQueue();

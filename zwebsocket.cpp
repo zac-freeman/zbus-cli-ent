@@ -48,3 +48,27 @@ qint64 ZWebSocket::sendZBusEvent(const ZBusEvent &event)
       return 0;
   }
 }
+
+qint64 ZWebSocket::sendZBusEvents(const QStringList &events)
+{
+  QList<ZBusEvent> zBusEvents;
+  QString event;
+  foreach(event, events)
+  {
+      zBusEvents.append(event);
+  }
+
+  return sendZBusEvents(zBusEvents);
+}
+
+qint64 ZWebSocket::sendZBusEvents(const QList<ZBusEvent> &events)
+{
+  qint64 bytesSent = 0;
+  ZBusEvent event;
+  foreach(event, events)
+  {
+      bytesSent += sendZBusEvent(event);
+  }
+
+  return bytesSent;
+}

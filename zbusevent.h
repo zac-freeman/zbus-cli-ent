@@ -7,7 +7,7 @@
 class ZBusEvent
 {
 public:
-  ZBusEvent(const QString &event);  //TODO: specify this takes a json string
+  ZBusEvent(const QString &event = QString());  //TODO: specify this takes a json string
   ZBusEvent(const QString &event, const QString &data);
 
   QString toJson() const;

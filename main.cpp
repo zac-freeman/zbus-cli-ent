@@ -8,6 +8,7 @@
 #include <QCommandLineParser>
 #include <QCoreApplication>
 #include <QDebug>
+#include <QList>
 #include <QObject>
 #include <QUrl>
 #include <signal.h>
@@ -59,9 +60,9 @@ int main(int argc, char **argv)
       QObject::connect(&zBusClient, &ZWebSocket::processedEventQueue,
                        &app, &QCoreApplication::quit);
 
-      // send zBus event to client, then connect to zBus server
+      // send zBus events to client, then connect to zBus server
       // this ensures a processedEventQueue signal is always emitted
-      zBusClient.sendZBusEvent(ZBusEvent(parser.value("send")));
+      zBusClient.sendZBusEvents(parser.values("send"));
       zBusClient.open(zBusUrl);
 
       return app.exec();
