@@ -16,7 +16,7 @@ public:
   ZBusCli(QObject *parent = nullptr);
   ~ZBusCli();
 
-  void exec();
+  void exec(const QUrl &zBusUrl);
 
 signals:
   void eventSubmitted(const QString &event, const QString &data);

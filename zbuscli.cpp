@@ -58,10 +58,10 @@ ZBusCli::~ZBusCli()
   delete p;
 }
 
-void ZBusCli::exec()
+void ZBusCli::exec(const QUrl &zBusUrl)
 {
   // connect client to zBus server
-  p->client.open(QUrl("ws://10.0.0.40:8180"));
+  p->client.open(zBusUrl);
 
   // wait for input in another thread
   QtConcurrent::run(this, &ZBusCli::ncurses);
@@ -245,7 +245,8 @@ void ZBusCli::ncurses()
 
 void ZBusCli::onDisconnected()
 {
-  QTimer::singleShot(1000, [this] {p->client.open(QUrl("ws://10.0.0.40:8180"));});
+  QUrl zBusUrl = p->client.requestUrl();
+  QTimer::singleShot(1000, [this, &zBusUrl] {p->client.open(zBusUrl);});
 }
 
 qint64 ZBusCli::onEventSubmitted(const QString &event, const QString &data)
