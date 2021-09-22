@@ -1,7 +1,6 @@
 #ifndef ZBUS_CLI_H
 #define ZBUS_CLI_H
 
-#include <QAbstractSocket>
 #include <QObject>
 
 class ZBusEvent;
