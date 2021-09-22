@@ -1,6 +1,5 @@
 // TODO: add unit tests
 // TODO: add README
-// TODO: add comments
 #include "zbuscli.h"
 #include "zbusevent.h"
 #include "zwebsocket.h"
@@ -15,6 +14,14 @@
 
 void handleSignal(int signum);
 
+/* \brief If one or more "send" parameters are provided, the application sends them to the provided
+ *        "websocket" URL and exits. If zero "send" parameters are provided, the application
+ *        launches an interactive text-based UI that displays events received from zBus and sends
+ *        submitted events to zBus.
+ *
+ * \param <argc> Number of arguments provided to the command line (including the program name!).>
+ * \param <argv> Array of arguments provided to the command line.
+ */
 int main(int argc, char **argv)
 {
   QCoreApplication app(argc, argv);
@@ -65,13 +72,17 @@ int main(int argc, char **argv)
       zBusClient.open(zBusUrl);
 
       return app.exec();
-  } else {
-      ZBusCli zBusCli;
-      zBusCli.exec(zBusUrl);
-      return app.exec();
   }
+
+  ZBusCli zBusCli;
+  zBusCli.exec(zBusUrl);
+  return app.exec();
 }
 
+/* \brief Exits the application upon receiving an interrupt or terminate signal.
+ *
+ * \param <signum> Integer that maps to a unix signal.
+ */
 void handleSignal(int signum)
 {
   if ((signum == SIGINT) || (signum == SIGTERM))

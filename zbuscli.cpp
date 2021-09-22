@@ -12,6 +12,16 @@
 #include <form.h>
 #include <ncurses.h>
 
+// How long to wait after a disconnection from zBus to retry connecting, in milliseconds.
+static const int RETRY_DELAY_MS = 1000;
+
+// How long to wait for input before updating the display, in deciseconds.
+static const int INPUT_WAIT_DS = 10;
+
+/* Container for the received events, zBus client, and pointers to the ncurses objects. The WINDOW,
+ * FIELD, and FORM pointers are declared here, but there are instantiated and mantained in another
+ * thread.
+ */
 class ZBusCliPrivate
 {
 public:
@@ -30,6 +40,11 @@ public:
   FORM *entryForm;
 };
 
+/* \brief Constructs an instance of ZBusCli, setting up the retry logic and the connections between
+ *        the zBus client and the ncurses event loop.
+ *
+ * \param <parent> The parent of the object instantiated.
+ */
 ZBusCli::ZBusCli(QObject *parent) : QObject(parent)
 {
   p = new ZBusCliPrivate();
@@ -42,6 +57,9 @@ ZBusCli::ZBusCli(QObject *parent) : QObject(parent)
           this, &ZBusCli::onZBusEventReceived);
 }
 
+/* \brief Frees up memory used by the ncurses objects, returns the terminal to its normal appearance
+ *        and behavior, and cleans up the PIMPL object.
+ */
 ZBusCli::~ZBusCli()
 {
   delwin(p->helpWindow);
@@ -58,6 +76,11 @@ ZBusCli::~ZBusCli()
   delete p;
 }
 
+/* \brief Connects the zBus client to the zBus server at the given URL, and starts the ncurses event
+ *        loop.
+ *
+ * \param <zBusUrl> URL to zBus.
+ */
 void ZBusCli::exec(const QUrl &zBusUrl)
 {
   // connect client to zBus server
@@ -67,31 +90,59 @@ void ZBusCli::exec(const QUrl &zBusUrl)
   QtConcurrent::run(this, &ZBusCli::ncurses);
 }
 
+/* \brief Attempts to connect to zBus after a delay. This is connected to ZWebSocket's disconnected
+ *        signal to enable retries.
+ */
 void ZBusCli::onDisconnected()
 {
   QUrl zBusUrl = p->client.requestUrl();
-  QTimer::singleShot(1000, [this, &zBusUrl] {p->client.open(zBusUrl);});
+  QTimer::singleShot(RETRY_DELAY_MS, [this, &zBusUrl] {p->client.open(zBusUrl);});
 }
 
+/* \brief Constructs a ZBusEvent from the given event string and data string, and sends it to zBus.
+ *        This is connected to the eventSubmitted signal that is emitted from the ncurses event loop
+ *        to enable sending events from the text-based UI.
+ *
+ * \param <event> String containing the event sender and event type.
+ * \param <data> String containing the event data.
+ *
+ * \returns Number of bytes sent.
+ */
 qint64 ZBusCli::onEventSubmitted(const QString &event, const QString &data)
 {
   return p->client.sendZBusEvent(ZBusEvent(event.trimmed(), data.trimmed()));
 }
 
+/* \brief Stores the given event in the eventHistory list. This is connected to ZWebSocket's
+ *        zBusEventReceived signal in order to save all received events.
+ *
+ * \param <event> Event received from zBus.
+ */
 void ZBusCli::onZBusEventReceived(const ZBusEvent &event)
 {
   p->eventHistory.append(event);
 }
 
+/* \brief The ncurses event loop. This initializes the ncurses objects, then begins waiting for
+ *        input and updating the display.
+ *
+ *        This is run in its own thread for two reasons:
+ *        - wgetch() must be polling at all times in order to capture all input from the user.
+ *          This is accomplished by placing wgetch() inside an infinite loop. This infinite loop
+ *          prevents anything outside the loop from continuing, including the Qt event loop.
+ *        - ncurses can not be used asynchronously. It makes use of global variables and shares them
+ *          freely between functions. Connecting window updates to Qt signals can lead to more than
+ *          one ncurses function being invoked at once, resulting in undefined behavior. Instead,
+ *          all window updates are performed in the infinite loop.
+ */
 void ZBusCli::ncurses()
 {
-  // start curses mode with character echoing and line buffering disabled
-  initscr();
-  keypad(stdscr, true);
-  noecho();
-  cbreak();
-  nonl();
-  halfdelay(10);
+  initscr();                // starts curses mode and instantiates stdscr
+  keypad(stdscr, true);     // function keys are captured as input like characters
+  noecho();                 // input is not echo'd to the screen by default
+  cbreak();                 // input is immediately captured, rather than after a line break
+  nonl();                   // allows curses to detect the return key
+  halfdelay(INPUT_WAIT_DS); // sets delay between infinite loop iterations
 
   // get width and height of screen
   int screenRows, screenColumns;
@@ -170,34 +221,44 @@ void ZBusCli::ncurses()
   // move cursor to start of event entry field
   form_driver(p->entryForm, REQ_END_LINE);
 
-  // capture input and update display
+  /* Behold, the infinite loop. It captures input and updates the display. */
   int previousSize = 0;
   while (true)
   {
     char input = wgetch(p->entryWindow);
     switch(input)
     {
+        // if no input was received during the wait, move on
         case ERR:
             break;
+
+        // on Tab, move the cursor to the next field
         case '\t':
         case KEY_STAB:
             form_driver(p->entryForm, REQ_NEXT_FIELD);
             form_driver(p->entryForm, REQ_END_LINE);
             break;
+
+        // On Enter, send the contents of the fields to zBus
         case '\r':
         case '\n':
         case KEY_ENTER:
             form_driver(p->entryForm, REQ_VALIDATION);
             emit eventSubmitted(field_buffer(p->entryFields[0], 0), field_buffer(p->entryFields[1], 0));
             break;
+
+        // on Backspace, backspace
         case 127:
         case KEY_BACKSPACE:
             form_driver(p->entryForm, REQ_DEL_PREV);
             break;
+
+        // provide all other input as characters to the current field
         default:
             form_driver(p->entryForm, input);
     }
 
+    // update the connection status message
     if (p->client.isValid())
     {
         wmove(p->statusWindow, 0, 0);
@@ -211,6 +272,7 @@ void ZBusCli::ncurses()
         wrefresh(p->statusWindow);
     }
 
+    // display the connection error message, if there is one
     if (p->client.error() != QAbstractSocket::UnknownSocketError)
     {
         wmove(p->statusWindow, 1, 0);
@@ -220,6 +282,7 @@ void ZBusCli::ncurses()
         wrefresh(p->statusWindow);
     }
 
+    // update the event history, if any new events have been received
     if (p->eventHistory.size() > previousSize)
     {
         previousSize = p->eventHistory.size();

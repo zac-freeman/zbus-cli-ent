@@ -6,6 +6,9 @@
 class ZBusEvent;
 class ZBusCliPrivate;
 
+/* Bridge between the ZWebSocket sending and receiving events, and the ncurses event loop displaying
+ * the events and accepting input from the user.
+ */
 class ZBusCli : public QObject
 {
   Q_OBJECT

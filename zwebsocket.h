@@ -6,6 +6,8 @@
 class ZBusEvent;
 class ZWebSocketPrivate;
 
+/* A QWebSocket configured for connecting to, and communicating with, the zBus server.
+ */
 class ZWebSocket : public QWebSocket
 {
   Q_OBJECT
