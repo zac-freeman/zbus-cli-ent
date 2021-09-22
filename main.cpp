@@ -1,6 +1,6 @@
 // TODO: add unit tests
 // TODO: add README
-// TODO: remove zbusevent dep
+// TODO: add comments
 #include "zbuscli.h"
 #include "zbusevent.h"
 #include "zwebsocket.h"
@@ -10,6 +10,7 @@
 #include <QDebug>
 #include <QObject>
 #include <QUrl>
+#include <signal.h>
 
 void handleSignal(int signum);
 
@@ -45,21 +46,36 @@ int main(int argc, char **argv)
       return 1;
   }
 
-  // TODO: dont parse commas as separator
   // TODO: send multiple events
-  // TODO: validate provided json?
-  // TODO: check signals in send mode
   if (parser.isSet("send"))
   {
+      // quit application upon receiving signal to quit (e.g. Ctrl+C)
+      signal(SIGINT, handleSignal);
+      signal(SIGTERM, handleSignal);
+
       ZWebSocket zBusClient;
+
+      // quit application after processing provided events
       QObject::connect(&zBusClient, &ZWebSocket::processedEventQueue,
                        &app, &QCoreApplication::quit);
-      zBusClient.open(zBusUrl);
+
+      // send zBus event to client, then connect to zBus server
+      // this ensures a processedEventQueue signal is always emitted
       zBusClient.sendZBusEvent(ZBusEvent(parser.value("send")));
+      zBusClient.open(zBusUrl);
+
       return app.exec();
   } else {
       ZBusCli zBusCli;
       zBusCli.exec(zBusUrl);
       return app.exec();
+  }
+}
+
+void handleSignal(int signum)
+{
+  if ((signum == SIGINT) || (signum == SIGTERM))
+  {
+      exit(signum);
   }
 }
