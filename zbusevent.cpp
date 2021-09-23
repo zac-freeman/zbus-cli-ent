@@ -34,7 +34,7 @@ ZBusEvent::ZBusEvent(const QString &event, const QString &data)
   this->type = senderAndType.value(1);
 
   // store data as appropriate type of JSON value
-  // if it is not an object or array, treat it like a string
+  // TODO: can ncurses preserve type info?
   bool ok = false;
   QJsonDocument dataDoc = QJsonDocument::fromJson(data.toUtf8());
   if (!dataDoc.isNull())
