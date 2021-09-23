@@ -112,7 +112,7 @@ public:
       historyWindow = newwin(historyRows, historyColumns, historyY, historyX);
 
       // move cursor to start of event entry field
-      form_driver(entryForm, REQ_END_LINE);
+      pos_form_cursor(entryForm);
   }
 
   /* \brief Frees up memory occupied by the ncurses windows, forms, and fields, then ends curses
@@ -217,7 +217,6 @@ void ZBusCli::onZBusEventReceived(const ZBusEvent &event)
   p->eventHistory.append(event);
 }
 
-// TODO: cursor position resetting
 /* \brief Starts an infinite loop that waits for input, processes pending Qt events, and updates the
  *        display. Forever.
  */
@@ -350,5 +349,8 @@ void ZBusCli::startEventLoop()
         // update screen
         wrefresh(p->historyWindow);
     }
+
+    // return cursor to last position in current field
+    pos_form_cursor(p->entryForm);
   }
 }
