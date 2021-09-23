@@ -18,8 +18,8 @@ building with `docker-compose run build`, then running with `docker-compose run 
 ### Commands & Arguments
 
 `zbus-cli-ent.x` takes two arguments:
-- `-w, --websocket <url>`: *REQUIRED* Takes the URL to the websocket that the zBus server is
-                           listening to. *NOTE*: If `zbus-cli-ent.x` is run inside a [Docker][]
+- `-w, --websocket <url>`: **REQUIRED** Takes the URL to the websocket that the zBus server is
+                           listening to. **NOTE**: If `zbus-cli-ent.x` is run inside a [Docker][]
                            container, the machine's IP address will need to be used in place of
                            `localhost`.
 
