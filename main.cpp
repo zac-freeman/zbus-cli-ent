@@ -1,5 +1,4 @@
 // TODO: add unit tests
-// TODO: add README
 #include "zbuscli.h"
 #include "zbusevent.h"
 #include "zwebsocket.h"
@@ -7,7 +6,6 @@
 #include <QCommandLineParser>
 #include <QCoreApplication>
 #include <QDebug>
-#include <QList>
 #include <QObject>
 #include <QUrl>
 #include <signal.h>
