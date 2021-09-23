@@ -25,7 +25,7 @@ ZBusEvent::ZBusEvent(const QString &json)
  *
  * \param <event> String containing the event sender and type in the format "sender.type".
  *                Corresponds to the "event" field in the JSON representation of a zBus event.
- * \param <data> String containing the event data.
+ * \param <data> JSON-formatted string containing the event data.
  */
 ZBusEvent::ZBusEvent(const QString &event, const QString &data)
 {
@@ -34,8 +34,29 @@ ZBusEvent::ZBusEvent(const QString &event, const QString &data)
   this->type = senderAndType.value(1);
 
   // store data as appropriate type of JSON value
+  // if it is not an object or array, treat it like a string
+  bool ok = false;
   QJsonDocument dataDoc = QJsonDocument::fromJson(data.toUtf8());
-  this->data = QJsonValue::fromVariant(dataDoc.toVariant());
+  if (!dataDoc.isNull())
+  {
+      this->data = QJsonValue::fromVariant(dataDoc.toVariant());
+  }
+  else if (data.toDouble(&ok) || ok)
+  {
+      this->data = QJsonValue(data.toDouble());
+  }
+  else if (data.toInt(&ok) || ok)
+  {
+      this->data = QJsonValue(data.toInt());
+  }
+  else if (data == "true" || data == "false")
+  {
+      this->data = QJsonValue(data == "true");
+  }
+  else
+  {
+      this->data = data;
+  }
 }
 
 /* \brief Creates a JSON-formatted string from the ZBusEvent.
