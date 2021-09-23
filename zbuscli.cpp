@@ -5,8 +5,8 @@
 
 // Qt libraries MUST be imported before ncurses libraries.
 // Somewhere in the depths of ncurses, there is a macro that redefines `timeout` globally.
+#include <QCoreApplication>
 #include <QTimer>
-#include <QtConcurrent>
 
 // ncurses libraries
 #include <form.h>
@@ -25,19 +25,125 @@ static const int INPUT_WAIT_DS = 10;
 class ZBusCliPrivate
 {
 public:
-  ZBusCliPrivate() {}
+
+  /* \brief Initializes ncurses and constructs the UI to use all available space in the terminal.
+   */
+  ZBusCliPrivate()
+  {
+      initscr();                // starts curses mode and instantiates stdscr
+      keypad(stdscr, true);     // function keys are captured as input like characters
+      noecho();                 // input is not echo'd to the screen by default
+      cbreak();                 // input is immediately captured, rather than after a line break
+      nonl();                   // allows curses to detect the return key
+      halfdelay(INPUT_WAIT_DS); // sets delay between infinite loop iterations
+
+      // get width and height of screen
+      int screenRows, screenColumns;
+      getmaxyx(stdscr, screenRows, screenColumns);
+
+      // create window to display keybinds
+      QString helpText = "Ctrl+C) exit program  Tab) switch field  Enter) send event";
+      int helpRows = 1;
+      int helpColumns = screenColumns;
+      int helpY = 0;
+      int helpX = screenColumns - helpColumns;
+      helpWindow = newwin(helpRows, helpColumns, helpY, helpX);
+      wmove(helpWindow, 0, 0);
+      wprintw(helpWindow, helpText.toUtf8().data());
+      wrefresh(helpWindow);
+
+      // create window to display connection status with zBus
+      int statusRows = 2;
+      int statusColumns = screenColumns;
+      int statusY = helpY + helpRows + 1;
+      int statusX = screenColumns - statusColumns;
+      statusWindow = newwin(statusRows, statusColumns, statusY, statusX);
+
+      // create field for input of event sender and event type
+      QString eventLabel = "event";
+      int eventRows = 1;
+      int eventColumns = screenColumns - (eventLabel.size() + 1);
+      int eventY = 0;
+      int eventX = screenColumns - eventColumns;
+      entryFields[0] = new_field(eventRows, eventColumns, eventY, eventX, 0, 0);
+      set_field_back(entryFields[0], A_UNDERLINE);
+      field_opts_off(entryFields[0], O_AUTOSKIP);
+      field_opts_off(entryFields[0], O_STATIC);
+      field_opts_off(entryFields[0], O_BLANK);
+
+      // create field for input of event data
+      QString dataLabel = "data";
+      int dataRows = 5;
+      int dataColumns = screenColumns - (dataLabel.size() + 1);
+      int dataY = eventY + eventRows + 1;
+      int dataX = screenColumns - dataColumns;
+      entryFields[1] = new_field(dataRows, dataColumns, dataY, dataX, 0, 0);
+      set_field_back(entryFields[1], A_UNDERLINE);
+      field_opts_off(entryFields[1], O_AUTOSKIP);
+      field_opts_off(entryFields[1], O_STATIC);
+      field_opts_off(entryFields[1], O_BLANK);
+
+      // create window to contain event entry form
+      int entryRows = 7;
+      int entryColumns = screenColumns;
+      int entryY = statusY + statusRows + 1;
+      int entryX = screenColumns - entryColumns;
+      entryWindow = newwin(entryRows, entryColumns, entryY, entryX);
+      entrySubwindow = derwin(entryWindow, entryRows, entryColumns, 0, 0);
+
+      // create event entry form to contain event entry fields
+      entryForm = new_form(entryFields);
+      set_form_win(entryForm, entryWindow);
+      set_form_sub(entryForm, entrySubwindow);
+      post_form(entryForm);
+
+      // add labels for event entry fields
+      wmove(entryWindow, 0, 0);
+      wprintw(entryWindow, "event");
+      wmove(entryWindow, 2, 0);
+      wprintw(entryWindow, "data");
+      wrefresh(entryWindow);
+
+      // create window for event history, using the remaining rows in the screen
+      int historyRows = screenRows - (entryY + entryRows + 1);
+      int historyColumns = screenColumns;
+      int historyY = screenRows - historyRows;
+      int historyX = screenColumns - historyColumns;
+      historyWindow = newwin(historyRows, historyColumns, historyY, historyX);
+
+      // move cursor to start of event entry field
+      form_driver(entryForm, REQ_END_LINE);
+  }
+
+  /* \brief Frees up memory occupied by the ncurses windows, forms, and fields, then ends curses
+   *        mode, returning the terminal to its regular appearance and behavior.
+   */
+  ~ZBusCliPrivate()
+  {
+      delwin(helpWindow);
+      delwin(entryWindow);
+      delwin(entrySubwindow);
+      delwin(statusWindow);
+      delwin(historyWindow);
+
+      free_form(entryForm);
+      free_field(entryFields[0]);
+      free_field(entryFields[1]);
+
+      endwin();
+  }
 
   QList<ZBusEvent> eventHistory;
   ZWebSocket client;
 
-  WINDOW *helpWindow;
-  WINDOW *statusWindow;
-  WINDOW *entryWindow;
-  WINDOW *entrySubwindow;
-  WINDOW *historyWindow;
+  FIELD *entryFields[2] = {};
+  FORM *entryForm = nullptr;
 
-  FIELD *entryFields[2];
-  FORM *entryForm;
+  WINDOW *helpWindow = nullptr;
+  WINDOW *statusWindow = nullptr;
+  WINDOW *entryWindow = nullptr;
+  WINDOW *entrySubwindow = nullptr;
+  WINDOW *historyWindow = nullptr;
 };
 
 /* \brief Constructs an instance of ZBusCli, setting up the retry logic and the connections between
@@ -57,22 +163,10 @@ ZBusCli::ZBusCli(QObject *parent) : QObject(parent)
           this, &ZBusCli::onZBusEventReceived);
 }
 
-/* \brief Frees up memory used by the ncurses objects, returns the terminal to its normal appearance
- *        and behavior, and cleans up the PIMPL object.
+/* \brief Cleans up the PIMPL object.
  */
 ZBusCli::~ZBusCli()
 {
-  delwin(p->helpWindow);
-  delwin(p->entryWindow);
-  delwin(p->entrySubwindow);
-  delwin(p->statusWindow);
-  delwin(p->historyWindow);
-
-  free_form(p->entryForm);
-  free_field(p->entryFields[0]);
-  free_field(p->entryFields[1]);
-
-  endwin();
   delete p;
 }
 
@@ -86,8 +180,8 @@ void ZBusCli::exec(const QUrl &zBusUrl)
   // connect client to zBus server
   p->client.open(zBusUrl);
 
-  // wait for input in another thread
-  QtConcurrent::run(this, &ZBusCli::ncurses);
+  // wait for input and update display
+  startEventLoop();
 }
 
 /* \brief Attempts to connect to zBus after a delay. This is connected to ZWebSocket's disconnected
@@ -123,106 +217,17 @@ void ZBusCli::onZBusEventReceived(const ZBusEvent &event)
   p->eventHistory.append(event);
 }
 
-/* \brief The ncurses event loop. This initializes the ncurses objects, then begins waiting for
- *        input and updating the display.
- *
- *        This is run in its own thread for two reasons:
- *        - wgetch() must be polling at all times in order to capture all input from the user.
- *          This is accomplished by placing wgetch() inside an infinite loop. This infinite loop
- *          prevents anything outside the loop from continuing, including the Qt event loop.
- *        - ncurses can not be used asynchronously. It makes use of global variables and shares them
- *          freely between functions. Connecting window updates to Qt signals can lead to more than
- *          one ncurses function being invoked at once, resulting in undefined behavior. Instead,
- *          all window updates are performed in the infinite loop.
+// TODO: arrow key support
+// TODO: cursor position resetting
+/* \brief Starts an infinite loop that waits for input, processes pending Qt events, and updates the
+ *        display. Forever.
  */
-void ZBusCli::ncurses()
+void ZBusCli::startEventLoop()
 {
-  initscr();                // starts curses mode and instantiates stdscr
-  keypad(stdscr, true);     // function keys are captured as input like characters
-  noecho();                 // input is not echo'd to the screen by default
-  cbreak();                 // input is immediately captured, rather than after a line break
-  nonl();                   // allows curses to detect the return key
-  halfdelay(INPUT_WAIT_DS); // sets delay between infinite loop iterations
-
-  // get width and height of screen
-  int screenRows, screenColumns;
-  getmaxyx(stdscr, screenRows, screenColumns);
-
-  // create window to display keybinds
-  QString helpText = "Ctrl+C) exit program  Tab) switch field  Enter) send event";
-  int helpRows = 1;
-  int helpColumns = screenColumns;
-  int helpY = 0;
-  int helpX = screenColumns - helpColumns;
-  p->helpWindow = newwin(helpRows, helpColumns, helpY, helpX);
-  wmove(p->helpWindow, 0, 0);
-  wprintw(p->helpWindow, helpText.toUtf8().data());
-  wrefresh(p->helpWindow);
-
-  // create window to display connection status with zBus
-  int statusRows = 2;
-  int statusColumns = screenColumns;
-  int statusY = helpY + helpRows + 1;
-  int statusX = screenColumns - statusColumns;
-  p->statusWindow = newwin(statusRows, statusColumns, statusY, statusX);
-
-  // create field for input of event sender and event type
-  QString eventLabel = "event";
-  int eventRows = 1;
-  int eventColumns = screenColumns - (eventLabel.size() + 1);
-  int eventY = 0;
-  int eventX = screenColumns - eventColumns;
-  p->entryFields[0] = new_field(eventRows, eventColumns, eventY, eventX, 0, 0);
-  set_field_back(p->entryFields[0], A_UNDERLINE);
-  field_opts_off(p->entryFields[0], O_AUTOSKIP);
-  field_opts_off(p->entryFields[0], O_STATIC);
-  field_opts_off(p->entryFields[0], O_BLANK);
-
-  // create field for input of event data
-  QString dataLabel = "data";
-  int dataRows = 5;
-  int dataColumns = screenColumns - (dataLabel.size() + 1);
-  int dataY = eventY + eventRows + 1;
-  int dataX = screenColumns - dataColumns;
-  p->entryFields[1] = new_field(dataRows, dataColumns, dataY, dataX, 0, 0);
-  set_field_back(p->entryFields[1], A_UNDERLINE);
-  field_opts_off(p->entryFields[1], O_AUTOSKIP);
-  field_opts_off(p->entryFields[1], O_STATIC);
-  field_opts_off(p->entryFields[1], O_BLANK);
-
-  // create window to contain event entry form
-  int entryRows = 7;
-  int entryColumns = screenColumns;
-  int entryY = statusY + statusRows + 1;
-  int entryX = screenColumns - entryColumns;
-  p->entryWindow = newwin(entryRows, entryColumns, entryY, entryX);
-  p->entrySubwindow = derwin(p->entryWindow, entryRows, entryColumns, 0, 0);
-
-  // create event entry form to contain event entry fields
-  p->entryForm = new_form(p->entryFields);
-  set_form_win(p->entryForm, p->entryWindow);
-  set_form_sub(p->entryForm, p->entrySubwindow);
-  post_form(p->entryForm);
-
-  // add labels for event entry fields
-  wmove(p->entryWindow, 0, 0);
-  wprintw(p->entryWindow, "event");
-  wmove(p->entryWindow, 2, 0);
-  wprintw(p->entryWindow, "data");
-  wrefresh(p->entryWindow);
-
-  // create window for event history, using the remaining rows in the screen
-  int historyRows = screenRows - (entryY + entryRows + 1);
-  int historyColumns = screenColumns;
-  int historyY = screenRows - historyRows;
-  int historyX = screenColumns - historyColumns;
-  p->historyWindow = newwin(historyRows, historyColumns, historyY, historyX);
-
-  // move cursor to start of event entry field
-  form_driver(p->entryForm, REQ_END_LINE);
-
-  /* Behold, the infinite loop. It captures input and updates the display. */
+  // size of eventHistory during previous cycle of event loop
   int previousSize = 0;
+
+  // capture input, process pending Qt events, then update the display
   while (true)
   {
     char input = wgetch(p->entryWindow);
@@ -257,6 +262,9 @@ void ZBusCli::ncurses()
         default:
             form_driver(p->entryForm, input);
     }
+
+    // before updating the display, process pending Qt events
+    QCoreApplication::processEvents();
 
     // update the connection status message
     if (p->client.isValid())

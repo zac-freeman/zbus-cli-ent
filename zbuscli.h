@@ -29,7 +29,7 @@ private slots:
   void onZBusEventReceived(const ZBusEvent &event);
 
 private:
-  void ncurses();
+  void startEventLoop();
 
   ZBusCliPrivate *p;
 };
