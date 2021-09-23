@@ -217,7 +217,6 @@ void ZBusCli::onZBusEventReceived(const ZBusEvent &event)
   p->eventHistory.append(event);
 }
 
-// TODO: arrow key support
 // TODO: cursor position resetting
 /* \brief Starts an infinite loop that waits for input, processes pending Qt events, and updates the
  *        display. Forever.
@@ -230,7 +229,7 @@ void ZBusCli::startEventLoop()
   // capture input, process pending Qt events, then update the display
   while (true)
   {
-    char input = wgetch(p->entryWindow);
+    int input = wgetch(p->entryWindow);
     switch(input)
     {
         // if no input was received during the wait, move on
@@ -256,6 +255,30 @@ void ZBusCli::startEventLoop()
         case 127:
         case KEY_BACKSPACE:
             form_driver(p->entryForm, REQ_DEL_PREV);
+            break;
+
+        // on arrow key, move cursor (arrow keys are received as Esc+[+A)
+        case '\033':
+            wgetch(p->entryWindow);
+            switch(wgetch(p->entryWindow))
+            {
+                // arrow up
+                case 'A': 
+                    form_driver(p->entryForm, REQ_UP_CHAR);
+                    break;
+                // arrow down
+                case 'B': 
+                    form_driver(p->entryForm, REQ_DOWN_CHAR);
+                    break;
+                // arrow right
+                case 'C': 
+                    form_driver(p->entryForm, REQ_RIGHT_CHAR);
+                    break;
+                // arrow left
+                case 'D': 
+                    form_driver(p->entryForm, REQ_LEFT_CHAR);
+                    break;
+            }
             break;
 
         // provide all other input as characters to the current field
