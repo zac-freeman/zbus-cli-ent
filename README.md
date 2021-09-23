@@ -58,7 +58,7 @@ docker-compose run client \
 Start the interactive text-based UI:
 ```bash
 docker-compose run client \
-    --websocket ws://10.0.0.40:8180
+    --websocket ws://10.0.0.42:8180
 ```
 
 [Docker]: https://docs.docker.com/get-docker/
