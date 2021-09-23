@@ -18,10 +18,6 @@ static const int RETRY_DELAY_MS = 1000;
 // How long to wait for input before updating the display, in deciseconds.
 static const int INPUT_WAIT_DS = 10;
 
-/* Container for the received events, zBus client, and pointers to the ncurses objects. The WINDOW,
- * FIELD, and FORM pointers are declared here, but there are instantiated and mantained in another
- * thread.
- */
 class ZBusCliPrivate
 {
 public:
