@@ -64,8 +64,8 @@ int main(int argc, char **argv)
       QObject::connect(&zBusClient, &ZWebSocket::processedEventQueue,
                        &app, &QCoreApplication::quit);
 
-      // send zBus events to client, then connect to zBus server
-      // this ensures a processedEventQueue signal is always emitted
+      // send zBus events to client, then connect to zBus server to ensure the processedEventQueue
+      // signal is only emitted after all events are processed
       zBusClient.sendZBusEvents(parser.values("send"));
       zBusClient.open(zBusUrl);
 
