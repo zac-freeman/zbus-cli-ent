@@ -175,7 +175,6 @@ ZBusCli::~ZBusCli()
 void ZBusCli::exec(const QUrl &zBusUrl)
 {
   // connect client to zBus server
-  // TODO: if this fails, zBusUrl is not maintained
   p->client.open(zBusUrl);
 
   // wait for input and update display
