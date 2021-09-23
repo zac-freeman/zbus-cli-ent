@@ -129,6 +129,7 @@ public:
       endwin();
   }
 
+  // TODO: display inputted events in history, as well?
   QList<ZBusEvent> eventHistory;
   ZWebSocket client;
 
@@ -174,6 +175,7 @@ ZBusCli::~ZBusCli()
 void ZBusCli::exec(const QUrl &zBusUrl)
 {
   // connect client to zBus server
+  // TODO: if this fails, zBusUrl is not maintained
   p->client.open(zBusUrl);
 
   // wait for input and update display
@@ -186,7 +188,7 @@ void ZBusCli::exec(const QUrl &zBusUrl)
 void ZBusCli::onDisconnected()
 {
   QUrl zBusUrl = p->client.requestUrl();
-  QTimer::singleShot(RETRY_DELAY_MS, [this, &zBusUrl] {p->client.open(zBusUrl);});
+  QTimer::singleShot(RETRY_DELAY_MS, [this, zBusUrl] {p->client.open(zBusUrl);});
 }
 
 /* \brief Constructs a ZBusEvent from the given event string and data string, and sends it to zBus.
