@@ -4,6 +4,7 @@
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QStringList>
+#include <QVariant>
 
 /* \brief Constructs a ZBusEvent from a json-formatted string. If a field can not be extracted from
  *        the given string for any reason (e.g. invalid json, missing field), it will be left blank.
@@ -31,7 +32,10 @@ ZBusEvent::ZBusEvent(const QString &event, const QString &data)
   QStringList senderAndType = event.split(".");
   this->sender = senderAndType.value(0);
   this->type = senderAndType.value(1);
-  this->data = data;
+
+  // store data as appropriate type of JSON value
+  QJsonDocument dataDoc = QJsonDocument::fromJson(data.toUtf8());
+  this->data = QJsonValue::fromVariant(dataDoc.toVariant());
 }
 
 /* \brief Creates a JSON-formatted string from the ZBusEvent.
