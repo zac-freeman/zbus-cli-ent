@@ -276,7 +276,7 @@ void ZBusCli::startEventLoop()
             form_driver(p->entryForm, REQ_DEL_PREV);
             break;
 
-        // on arrow key, move cursor (arrow keys are received as Esc+[+A)
+        // on arrow key, move cursor (arrow keys are received in the form Esc+[+A)
         case '\033':
             wgetch(p->entryWindow);
             switch(wgetch(p->entryWindow))
@@ -313,19 +313,15 @@ void ZBusCli::startEventLoop()
     {
         wmove(p->statusWindow, 0, 0);
         wclear(p->statusWindow);
-        wattron(p->statusWindow, A_BOLD);
-        wattron(p->statusWindow, COLOR_PAIR(GREEN_TEXT));
+        wattron(p->statusWindow, COLOR_PAIR(GREEN_TEXT) | A_BOLD);
         wprintw(p->statusWindow, "status: connected to zBus");
-        wattroff(p->statusWindow, A_BOLD);
-        wattroff(p->statusWindow, COLOR_PAIR(GREEN_TEXT));
+        wattroff(p->statusWindow, COLOR_PAIR(GREEN_TEXT) | A_BOLD);
         wrefresh(p->statusWindow);
     } else {
         wmove(p->statusWindow, 0, 0);
         wclrtoeol(p->statusWindow);
-        wattron(p->statusWindow, A_BOLD);
         wattron(p->statusWindow, COLOR_PAIR(RED_TEXT) | A_BOLD);
         wprintw(p->statusWindow, "status: disconnected from zBus");
-        wattroff(p->statusWindow, A_BOLD);
         wattroff(p->statusWindow, COLOR_PAIR(RED_TEXT) | A_BOLD);
         wrefresh(p->statusWindow);
     }
@@ -335,12 +331,10 @@ void ZBusCli::startEventLoop()
     {
         wmove(p->statusWindow, 1, 0);
         wclrtoeol(p->statusWindow);
-        wattron(p->statusWindow, A_BOLD);
-        wattron(p->statusWindow, COLOR_PAIR(RED_TEXT));
+        wattron(p->statusWindow, COLOR_PAIR(RED_TEXT) | A_BOLD);
         wprintw(p->statusWindow, "error: ");
         wprintw(p->statusWindow, p->client.errorString().toUtf8().data());
-        wattroff(p->statusWindow, A_BOLD);
-        wattroff(p->statusWindow, COLOR_PAIR(RED_TEXT));
+        wattroff(p->statusWindow, COLOR_PAIR(RED_TEXT) | A_BOLD);
         wrefresh(p->statusWindow);
     }
 
