@@ -1,4 +1,3 @@
-// TODO: ncurses functions
 #include "zbuscli.h"
 
 #include "zbusevent.h"
@@ -360,7 +359,8 @@ void ZBusCli::startEventLoop()
             // do not display that event or any subsequent events
             Origin origin = p->eventHistory.at(i).first;
             QString json = p->eventHistory.at(i).second.toJson();
-            int height = ((json.size() - 1) / columns) + 1;
+            QString delimiter = ">>> ";
+            int height = ((json.size() + delimiter.size() - 1) / columns) + 1;
             if (row + height > rows) {
                 break;
             }
@@ -372,6 +372,7 @@ void ZBusCli::startEventLoop()
             {
                 wattron(p->historyWindow, A_BOLD);
             }
+            wprintw(p->historyWindow, delimiter.toUtf8().data());
             wprintw(p->historyWindow, json.toUtf8().data());
             wattroff(p->historyWindow, A_BOLD);
 
