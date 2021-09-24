@@ -1,3 +1,4 @@
+// TODO: ncurses functions
 #include "zbuscli.h"
 
 #include "zbusevent.h"
@@ -146,8 +147,6 @@ public:
       endwin();
   }
 
-  // TODO: display inputted events in history, as well?
-  // TODO: and differentiate received events from sent events
   QList<QPair<Origin, ZBusEvent>> eventHistory;
   ZWebSocket client;
 
