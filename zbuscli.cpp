@@ -18,6 +18,10 @@ static const int RETRY_DELAY_MS = 1000;
 // How long to wait for input before updating the display, in deciseconds.
 static const int INPUT_WAIT_DS = 10;
 
+// ncurses colors
+static const int GREEN_TEXT = 1;
+static const int RED_TEXT = 2;
+
 class ZBusCliPrivate
 {
 public:
@@ -27,11 +31,17 @@ public:
   ZBusCliPrivate()
   {
       initscr();                // starts curses mode and instantiates stdscr
+      start_color();            // enable using colors
+      use_default_colors();     // maps -1 to current/default color
       keypad(stdscr, true);     // function keys are captured as input like characters
       noecho();                 // input is not echo'd to the screen by default
       cbreak();                 // input is immediately captured, rather than after a line break
       nonl();                   // allows curses to detect the return key
       halfdelay(INPUT_WAIT_DS); // sets delay between infinite loop iterations
+
+      // initialize ncurses colors
+      init_pair(GREEN_TEXT, COLOR_GREEN, -1);
+      init_pair(RED_TEXT, COLOR_RED, -1);
 
       // get width and height of screen
       int screenRows, screenColumns;
@@ -130,6 +140,7 @@ public:
   }
 
   // TODO: display inputted events in history, as well?
+  // TODO: and differentiate received events from sent events
   QList<ZBusEvent> eventHistory;
   ZWebSocket client;
 
@@ -290,12 +301,20 @@ void ZBusCli::startEventLoop()
     {
         wmove(p->statusWindow, 0, 0);
         wclear(p->statusWindow);
+        wattron(p->statusWindow, A_BOLD);
+        wattron(p->statusWindow, COLOR_PAIR(GREEN_TEXT));
         wprintw(p->statusWindow, "status: connected to zBus");
+        wattroff(p->statusWindow, A_BOLD);
+        wattroff(p->statusWindow, COLOR_PAIR(GREEN_TEXT));
         wrefresh(p->statusWindow);
     } else {
         wmove(p->statusWindow, 0, 0);
         wclrtoeol(p->statusWindow);
+        wattron(p->statusWindow, A_BOLD);
+        wattron(p->statusWindow, COLOR_PAIR(RED_TEXT) | A_BOLD);
         wprintw(p->statusWindow, "status: disconnected from zBus");
+        wattroff(p->statusWindow, A_BOLD);
+        wattroff(p->statusWindow, COLOR_PAIR(RED_TEXT) | A_BOLD);
         wrefresh(p->statusWindow);
     }
 
@@ -304,8 +323,12 @@ void ZBusCli::startEventLoop()
     {
         wmove(p->statusWindow, 1, 0);
         wclrtoeol(p->statusWindow);
+        wattron(p->statusWindow, A_BOLD);
+        wattron(p->statusWindow, COLOR_PAIR(RED_TEXT));
         wprintw(p->statusWindow, "error: ");
         wprintw(p->statusWindow, p->client.errorString().toUtf8().data());
+        wattroff(p->statusWindow, A_BOLD);
+        wattroff(p->statusWindow, COLOR_PAIR(RED_TEXT));
         wrefresh(p->statusWindow);
     }
 
