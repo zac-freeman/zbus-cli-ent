@@ -33,30 +33,11 @@ ZBusEvent::ZBusEvent(const QString &event, const QString &data)
   this->sender = senderAndType.value(0);
   this->type = senderAndType.value(1);
 
-  // store data as appropriate type of JSON value
-  // TODO: can ncurses preserve type info?
-  bool ok = false;
+  // store data as appropriate type of JSON value; if the data is not an object or an array, it is
+  // assumed that it is a string
   QJsonDocument dataDoc = QJsonDocument::fromJson(data.toUtf8());
-  if (!dataDoc.isNull())
-  {
-      this->data = QJsonValue::fromVariant(dataDoc.toVariant());
-  }
-  else if (data.toDouble(&ok) || ok)
-  {
-      this->data = QJsonValue(data.toDouble());
-  }
-  else if (data.toInt(&ok) || ok)
-  {
-      this->data = QJsonValue(data.toInt());
-  }
-  else if (data == "true" || data == "false")
-  {
-      this->data = QJsonValue(data == "true");
-  }
-  else
-  {
-      this->data = data;
-  }
+  this->data = dataDoc.isNull() ? data
+                                : QJsonValue::fromVariant(dataDoc.toVariant());
 }
 
 /* \brief Creates a JSON-formatted string from the ZBusEvent.
