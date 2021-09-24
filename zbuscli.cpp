@@ -6,6 +6,8 @@
 // Qt libraries MUST be imported before ncurses libraries.
 // Somewhere in the depths of ncurses, there is a macro that redefines `timeout` globally.
 #include <QCoreApplication>
+#include <QList>
+#include <QPair>
 #include <QTimer>
 
 // ncurses libraries
@@ -21,6 +23,11 @@ static const int INPUT_WAIT_DS = 10;
 // ncurses colors
 static const int GREEN_TEXT = 1;
 static const int RED_TEXT = 2;
+
+/* Origin of events stored in zBus event history. All the events are either received from the zBus
+ * server, or sent to the zBus server.
+ */
+enum class Origin { Received, Sent };
 
 class ZBusCliPrivate
 {
@@ -141,7 +148,7 @@ public:
 
   // TODO: display inputted events in history, as well?
   // TODO: and differentiate received events from sent events
-  QList<ZBusEvent> eventHistory;
+  QList<QPair<Origin, ZBusEvent>> eventHistory;
   ZWebSocket client;
 
   FIELD *entryFields[2] = {};
@@ -201,7 +208,9 @@ void ZBusCli::onDisconnected()
   QTimer::singleShot(RETRY_DELAY_MS, [this, zBusUrl] {p->client.open(zBusUrl);});
 }
 
-/* \brief Constructs a ZBusEvent from the given event string and data string, and sends it to zBus.
+/* \brief Constructs a ZBusEvent from the given event string and data string, sends it to zBus, and
+ *        stores a copy in the eventHistory list.
+ *
  *        This is connected to the eventSubmitted signal that is emitted from the ncurses event loop
  *        to enable sending events from the text-based UI.
  *
@@ -212,17 +221,21 @@ void ZBusCli::onDisconnected()
  */
 qint64 ZBusCli::onEventSubmitted(const QString &event, const QString &data)
 {
-  return p->client.sendZBusEvent(ZBusEvent(event.trimmed(), data.trimmed()));
+  ZBusEvent zBusEvent = ZBusEvent(event.trimmed(), data.trimmed());
+  p->eventHistory.append({Origin::Sent, zBusEvent});
+  return p->client.sendZBusEvent(zBusEvent);
 }
 
-/* \brief Stores the given event in the eventHistory list. This is connected to ZWebSocket's
- *        zBusEventReceived signal in order to save all received events.
+/* \brief Stores the given event in the eventHistory list.
+ *
+ *        This is connected to ZWebSocket's zBusEventReceived signal in order to save all received
+ *        events.
  *
  * \param <event> Event received from zBus.
  */
 void ZBusCli::onZBusEventReceived(const ZBusEvent &event)
 {
-  p->eventHistory.append(event);
+  p->eventHistory.append({Origin::Received, event});
 }
 
 /* \brief Starts an infinite loop that waits for input, processes pending Qt events, and updates the
@@ -352,15 +365,22 @@ void ZBusCli::startEventLoop()
             // determine the height (due to line-wrapping) of the next event to be written;
             // if the event would extend past the end of the historyWindow,
             // do not display that event or any subsequent events
-            QString json = p->eventHistory.at(i).toJson();
+            Origin origin = p->eventHistory.at(i).first;
+            QString json = p->eventHistory.at(i).second.toJson();
             int height = ((json.size() - 1) / columns) + 1;
             if (row + height > rows) {
                 break;
             }
 
             // move to next row, and write event to line
+            // if the event was sent from this client, make it bold
             wmove(p->historyWindow, row, 0);
+            if (origin == Origin::Sent)
+            {
+                wattron(p->historyWindow, A_BOLD);
+            }
             wprintw(p->historyWindow, json.toUtf8().data());
+            wattroff(p->historyWindow, A_BOLD);
 
             // set row for next event immediately after current event
             row = row + height;
