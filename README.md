@@ -31,12 +31,16 @@ There are four [Docker][] commands:
 - `docker-compose run build` builds the `zbus-cli-ent.x` application.
 
 - `docker-compose run client` runs the `zbus-cli-ent.x` application. Arguments provided to this
-  command are received by the application.
+                              command are received by the application.
 
 - `docker-compose run shell` starts a bash shell inside the docker container with project repository
-  mounted inside of it.
+                             mounted inside of it.
 
 - `docker-compose run clean` removes all build artifacts.
+
+Additionally, there is a simple bash script to check the connection to zBus:
+- `./zbus-curl-test.sh <url>` negotiates a websocket connection with the zBus server at the given
+                              URL.
 
 ### Examples
 
@@ -59,6 +63,11 @@ Start the interactive text-based UI:
 ```bash
 docker-compose run client \
     --websocket ws://10.0.0.42:8180
+```
+
+Test the connection to zBus (note the exclusion of the `ws://` protocol from the URL):
+```bash
+./zbus-curl-test.sh 10.0.0.42:8180
 ```
 
 [Docker]: https://docs.docker.com/get-docker/
