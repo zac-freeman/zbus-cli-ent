@@ -9,6 +9,31 @@ services:
     volumes:
       - "./:/workspace"
 
+  build:
+    <<: *common
+    entrypoint:
+      - /bin/bash
+      - -c
+      - |
+        qmake-qt5 && make -j $$(nproc)
+
+  check:
+    <<: *common
+    working_dir: /workspace/test
+    entrypoint:
+      - /bin/bash
+      - -c
+      - |
+        qmake-qt5 && make -j $$(nproc) && ./test
+
+  clean:
+    <<: *common
+    entrypoint:
+      - /bin/bash
+      - -c
+      - |
+        make distclean
+
   client:
     <<: *common
     stdin_open: true
@@ -21,19 +46,3 @@ services:
     stdin_open: true
     tty: true
     entrypoint: /bin/bash
-
-  build:
-    <<: *common
-    entrypoint:
-      - /bin/bash
-      - -c
-      - |
-        qmake-qt5 && make -j $$(nproc)
-
-  clean:
-    <<: *common
-    entrypoint:
-      - /bin/bash
-      - -c
-      - |
-        make distclean

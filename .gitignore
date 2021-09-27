@@ -3,4 +3,6 @@ Makefile
 *.o
 *.x
 moc_*
-
+test/test
+*.moc
+test/target_wrapper.sh
