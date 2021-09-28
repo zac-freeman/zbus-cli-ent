@@ -1,4 +1,3 @@
-// TODO: add unit tests
 #include "zbuscli.h"
 #include "zbusevent.h"
 #include "zwebsocket.h"
