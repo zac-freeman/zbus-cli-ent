@@ -38,6 +38,8 @@ There are four [Docker][] commands:
 
 - `docker-compose run clean` removes all build artifacts.
 
+- `docker-compose run check` runs the unit tests.
+
 Additionally, there is a simple bash script to check the connection to zBus:
 - `./zbus-curl-test.sh <url>` negotiates a websocket connection with the zBus server at the given
                               URL.
