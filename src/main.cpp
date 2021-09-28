@@ -23,7 +23,7 @@ int main(int argc, char **argv)
 {
   QCoreApplication app(argc, argv);
   QCoreApplication::setApplicationName("zbus-cli-ent");
-  QCoreApplication::setApplicationVersion("0.1");
+  QCoreApplication::setApplicationVersion("1.0");
 
   QCommandLineParser parser;
   parser.setApplicationDescription("text-based zbus client");
