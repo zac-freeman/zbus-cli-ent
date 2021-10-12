@@ -83,6 +83,7 @@ public:
       field_opts_off(entryFields[0], O_AUTOSKIP);
       field_opts_off(entryFields[0], O_STATIC);
       field_opts_off(entryFields[0], O_BLANK);
+      field_opts_off(entryFields[0], O_WRAP);
 
       // create field for input of event data
       QString dataLabel = "data";
@@ -95,6 +96,7 @@ public:
       field_opts_off(entryFields[1], O_AUTOSKIP);
       field_opts_off(entryFields[1], O_STATIC);
       field_opts_off(entryFields[1], O_BLANK);
+      field_opts_off(entryFields[1], O_WRAP);
 
       // create window to contain event entry form
       int entryRows = 7;
