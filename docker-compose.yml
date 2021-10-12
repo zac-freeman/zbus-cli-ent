@@ -32,7 +32,7 @@ services:
       - /bin/bash
       - -c
       - |
-        make distclean
+        make distclean && cd test && make distclean
 
   client:
     <<: *common
