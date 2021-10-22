@@ -19,12 +19,16 @@ services:
 
   check:
     <<: *common
-    working_dir: /workspace/test
     entrypoint:
       - /bin/bash
       - -c
       - |
-        qmake-qt5 && make -j $$(nproc) && ./test
+        qmake-qt5 && \
+        make -j $$(nproc) && \
+        cd test && \
+        qmake-qt5 && \
+        make -j $$(nproc) && \
+        ./test
 
   clean:
     <<: *common
@@ -32,7 +36,9 @@ services:
       - /bin/bash
       - -c
       - |
-        make distclean && cd test && make distclean
+        make distclean && \
+        cd test && \
+        make distclean
 
   client:
     <<: *common
