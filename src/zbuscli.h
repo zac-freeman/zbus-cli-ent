@@ -42,6 +42,8 @@ private:
   enum Mode handle_command_input(int input);
   enum Mode handle_send_input(int input);
   enum Mode handle_peruse_input(int input);
+  void update_help_text(Mode mode);
+  void resize_history_window(Mode mode);
   void startEventLoop();
 
   ZBusCliPrivate *p;
