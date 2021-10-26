@@ -6,6 +6,16 @@
 class ZBusEvent;
 class ZBusCliPrivate;
 
+/* The mode determines what the client does with input received from the user.
+ *
+ * Command - The default mode. Switches to one of the other modes, based on the input received.
+ * Send - Takes input for the purpose of navigating and editing the event type and data fields, and
+ *        sending the constructed events.
+ * Peruse - Takes input for the purpose of navigating the event history.
+ *
+ */
+enum class Mode { Command, Send, Peruse };
+
 /* Bridge between the ZWebSocket sending and receiving events, and the ncurses event loop displaying
  * the events and accepting input from the user.
  */
@@ -29,6 +39,9 @@ private slots:
   void onZBusEventReceived(const ZBusEvent &event);
 
 private:
+  enum Mode handle_command_input(int input);
+  enum Mode handle_send_input(int input);
+  enum Mode handle_peruse_input(int input);
   void startEventLoop();
 
   ZBusCliPrivate *p;

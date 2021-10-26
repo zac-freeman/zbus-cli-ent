@@ -15,10 +15,10 @@
 #include <ncurses.h>
 
 // How long to wait after a disconnection from zBus to retry connecting, in milliseconds.
-static const int RETRY_DELAY_MS = 1000;
+static const int RETRY_DELAY_MS = 500;
 
 // How long to wait for input before updating the display, in deciseconds.
-static const int INPUT_WAIT_DS = 10;
+static const int INPUT_WAIT_DS = 1;
 
 // ncurses colors
 static const int GREEN_TEXT = 1;
@@ -29,9 +29,28 @@ static const int RED_TEXT = 2;
  */
 enum class Origin { Received, Sent };
 
+// Maps each mode to the corresponding help text to be displayed.
+static const QMap<Mode, QString> help_text{
+    { Mode::Command, "Ctrl+C) exit program, s) begin send mode, p) begin peruse mode" },
+    { Mode::Send, "Ctrl+C) exit program, Esc) begin command mode, Tab) switch field, "
+                   "Enter) send event" },
+    { Mode::Peruse, "Ctrl+C) exit program, Esc) begin command mode" }
+};
+
 class ZBusCliPrivate
 {
 public:
+  QList<QPair<Origin, ZBusEvent>> eventHistory;
+  ZWebSocket client;
+
+  FIELD *entryFields[2] = {};
+  FORM *entryForm = nullptr;
+
+  WINDOW *helpWindow = nullptr;
+  WINDOW *statusWindow = nullptr;
+  WINDOW *entryWindow = nullptr;
+  WINDOW *entrySubwindow = nullptr;
+  WINDOW *historyWindow = nullptr;
 
   /* \brief Initializes ncurses and constructs the UI to use all available space in the terminal.
    */
@@ -40,7 +59,7 @@ public:
       initscr();                // starts curses mode and instantiates stdscr
       start_color();            // enable using colors
       use_default_colors();     // maps -1 to current/default color
-      keypad(stdscr, true);     // function keys are captured as input like characters
+      keypad(stdscr, TRUE);     // function keys are captured as input like characters
       noecho();                 // input is not echo'd to the screen by default
       cbreak();                 // input is immediately captured, rather than after a line break
       nonl();                   // allows curses to detect the return key
@@ -55,14 +74,13 @@ public:
       getmaxyx(stdscr, screenRows, screenColumns);
 
       // create window to display keybinds
-      QString helpText = "Ctrl+C) exit program  Tab) switch field  Enter) send event";
       int helpRows = 1;
       int helpColumns = screenColumns;
       int helpY = 0;
       int helpX = screenColumns - helpColumns;
       helpWindow = newwin(helpRows, helpColumns, helpY, helpX);
       wmove(helpWindow, 0, 0);
-      wprintw(helpWindow, helpText.toUtf8().data());
+      wprintw(helpWindow, help_text[Mode::Command].toUtf8().data());
       wrefresh(helpWindow);
 
       // create window to display connection status with zBus
@@ -147,18 +165,6 @@ public:
 
       endwin();
   }
-
-  QList<QPair<Origin, ZBusEvent>> eventHistory;
-  ZWebSocket client;
-
-  FIELD *entryFields[2] = {};
-  FORM *entryForm = nullptr;
-
-  WINDOW *helpWindow = nullptr;
-  WINDOW *statusWindow = nullptr;
-  WINDOW *entryWindow = nullptr;
-  WINDOW *entrySubwindow = nullptr;
-  WINDOW *historyWindow = nullptr;
 };
 
 /* \brief Constructs an instance of ZBusCli, setting up the retry logic and the connections between
@@ -238,18 +244,35 @@ void ZBusCli::onZBusEventReceived(const ZBusEvent &event)
   p->eventHistory.append({Origin::Received, event});
 }
 
-/* \brief Starts an infinite loop that waits for input, processes pending Qt events, and updates the
- *        display. Forever.
+/* \brief Handles input received while the client is in Command mode.
+ *
+ * \param <input> Character code of keypress from keyboard.
+ *
+ * \returns The Mode that further input should be processed with.
  */
-void ZBusCli::startEventLoop()
+Mode ZBusCli::handle_command_input(int input)
 {
-  // size of eventHistory during previous cycle of event loop
-  int previousSize = 0;
+    switch(input)
+    {
+        case 's':
+            return Mode::Send;
 
-  // capture input, process pending Qt events, then update the display
-  while (true)
-  {
-    int input = wgetch(p->entryWindow);
+        case 'p':
+            return Mode::Peruse;
+
+        default:
+            return Mode::Command;
+    }
+}
+
+/* \brief Handles input received while the client is in Send mode.
+ *
+ * \param <input> Character code of keypress from keyboard.
+ *
+ * \returns The Mode that further input should be processed with.
+ */
+Mode ZBusCli::handle_send_input(int input)
+{
     switch(input)
     {
         // if no input was received during the wait, move on
@@ -277,24 +300,34 @@ void ZBusCli::startEventLoop()
             form_driver(p->entryForm, REQ_DEL_PREV);
             break;
 
-        // on arrow key, move cursor (arrow keys are received in the form Esc+[+A)
+        // on Escape, determine whether or not this is the beginning of an "Escape Sequence"
         case '\033':
-            wgetch(p->entryWindow);
-            switch(wgetch(p->entryWindow))
+            input = wgetch(p->entryWindow);
+
+            // it's not an "Escape Sequence"; on Escape, switch to Command Mode and process
+            // subsequent input
+            if (input != '[')
             {
-                // arrow up
+                return handle_command_input(input);
+            }
+
+            // it's an "Escape Sequence"; on Arrow Key, move cursor (arrow keys are received in the
+            // form "Esc + [ + A")
+            switch (wgetch(p->entryWindow))
+            {
+                // Up
                 case 'A': 
                     form_driver(p->entryForm, REQ_UP_CHAR);
                     break;
-                // arrow down
+                // Down
                 case 'B': 
                     form_driver(p->entryForm, REQ_DOWN_CHAR);
                     break;
-                // arrow right
+                // Right
                 case 'C': 
                     form_driver(p->entryForm, REQ_RIGHT_CHAR);
                     break;
-                // arrow left
+                // Left
                 case 'D': 
                     form_driver(p->entryForm, REQ_LEFT_CHAR);
                     break;
@@ -306,8 +339,68 @@ void ZBusCli::startEventLoop()
             form_driver(p->entryForm, input);
     }
 
+    return Mode::Send;
+}
+
+/* \brief Handles input received while the client is in Peruse mode.
+ *
+ * \param <input> Character code of keypress from keyboard.
+ *
+ * \returns The Mode that further input should be processed with.
+ */
+Mode ZBusCli::handle_peruse_input(int input)
+{
+    switch(input)
+    {
+        case '\033':
+            return Mode::Command;
+
+        default:
+            return Mode::Peruse;
+    }
+}
+
+/* \brief Starts an infinite loop that waits for input, processes pending Qt events, and updates the
+ *        display. Forever.
+ */
+void ZBusCli::startEventLoop()
+{
+  int previousSize = 0; // size of eventHistory during previous cycle of event loop
+  Mode current_mode = Mode::Command; // the mode for processing fresh input
+
+  // capture input, process pending Qt events, then update the display
+  while (true)
+  {
+    int input = wgetch(p->entryWindow);
+
+    // process input with current mode, and capture next mode for next input
+    Mode next_mode;
+    switch(current_mode)
+    {
+        case Mode::Command:
+            next_mode = handle_command_input(input);
+            break;
+
+        case Mode::Send:
+            next_mode = handle_send_input(input);
+            break;
+
+        case Mode::Peruse:
+            next_mode = handle_peruse_input(input);
+            break;
+    }
+
     // before updating the display, process pending Qt events
     QCoreApplication::processEvents();
+
+    // update the help text, if the mode has changed
+    if (current_mode != next_mode)
+    {
+        wmove(p->helpWindow, 0, 0);
+        wclear(p->helpWindow);
+        wprintw(p->helpWindow, help_text[next_mode].toUtf8().data());
+        wrefresh(p->helpWindow);
+    }
 
     // update the connection status message
     if (p->client.isValid())
@@ -385,6 +478,9 @@ void ZBusCli::startEventLoop()
         // update screen
         wrefresh(p->historyWindow);
     }
+
+    // update mode for processing next input
+    current_mode = next_mode;
 
     // return cursor to last position in current field
     pos_form_cursor(p->entryForm);
