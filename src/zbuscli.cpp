@@ -404,6 +404,7 @@ void ZBusCli::resize_history_window(Mode mode)
     mvwin(p->history_window, p->history.y, p->history.x);
     wrefresh(p->history_window);
 
+    // display the entry window if it is no longer overlapped by the history window
     if (mode == Mode::Send)
     {
         redrawwin(p->entry_window);
