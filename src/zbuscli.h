@@ -3,8 +3,9 @@
 
 #include <QObject>
 
-class ZBusEvent;
+class PeruseResult;
 class ZBusCliPrivate;
+class ZBusEvent;
 
 /* The mode determines what the client does with input received from the user.
  *
@@ -29,6 +30,10 @@ public:
   ~ZBusCli();
 
   void exec(const QUrl &zBusUrl);
+  void startEventLoop();
+  enum Mode handle_command_input(int input);
+  enum Mode handle_send_input(int input);
+  PeruseResult handle_peruse_input(int input, int selection);
 
 signals:
   void eventSubmitted(const QString &event, const QString &data);
@@ -39,13 +44,6 @@ private slots:
   void onZBusEventReceived(const ZBusEvent &event);
 
 private:
-  enum Mode handle_command_input(int input);
-  enum Mode handle_send_input(int input);
-  enum Mode handle_peruse_input(int input);
-  void update_help_text(Mode mode);
-  void resize_history_window(Mode mode);
-  void startEventLoop();
-
   ZBusCliPrivate *p;
 };
 
