@@ -6,6 +6,7 @@ LIBS += -lform -lncurses
 
 TARGET = zbus-cli-ent.x
 
+HEADERS += src/mockdata.h
 HEADERS += src/zbuscli.h
 HEADERS += src/zbusevent.h
 HEADERS += src/zwebsocket.h

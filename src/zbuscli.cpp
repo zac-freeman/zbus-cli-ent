@@ -6,6 +6,8 @@
 // Qt libraries MUST be imported before ncurses libraries.
 // Somewhere in the depths of ncurses, there is a macro that redefines `timeout` globally.
 #include <QCoreApplication>
+#include <QJsonDocument>
+#include <QJsonValue>
 #include <QList>
 #include <QPair>
 #include <QTimer>
@@ -31,17 +33,35 @@ static const int RED_TEXT = 2;
 enum class Origin { Received, Sent };
 
 // Provides a visual indicator for the origin of an event.
-static const QMap<Origin, QString> origin_sign{
+static const QMap<Origin, QString> origin_sign
+{
     { Origin::Received, "-> " },
     { Origin::Sent, "<- " }
 };
 
 // Maps each mode to the corresponding help text to be displayed.
-static const QMap<Mode, QString> help_text{
+static const QMap<Mode, QString> help_text
+{
     { Mode::Command, "Ctrl+C) exit program, s) begin send mode, p) begin peruse mode" },
     { Mode::Send, "Ctrl+C) exit program, Esc) begin command mode, Tab) switch field, "
                    "Enter) send event" },
     { Mode::Peruse, "Ctrl+C) exit program, Esc) begin command mode" }
+};
+
+static const QMap<QString, QString> mock_menu_text
+{
+    {
+        "main",
+        "1. pinpad\n"
+        "2. printer\n"
+        "3. scanner"
+    },
+    {
+        "pinpad",
+        "1. card\n"
+        "2. other\n"
+        "0. back"
+    }
 };
 
 // Used for multiple return from handle_peruse_input
@@ -60,13 +80,16 @@ class ZBusCliPrivate
 {
 public:
     QList<QPair<Origin, ZBusEvent>> event_history;
+    QString current_request_id;
+    QString current_auth_attempt_id;
     ZWebSocket client;
 
-    FIELD *entry_fields[2] = {};
+    FIELD *entry_fields[3] = {};
     FORM *entry_form = nullptr;
 
     WINDOW *help_window = nullptr;
     WINDOW *status_window = nullptr;
+    WINDOW *mock_menu_window = nullptr;
     WINDOW *entry_window = nullptr;
     WINDOW *entry_subwindow = nullptr;
     WINDOW *history_window = nullptr;
@@ -74,6 +97,7 @@ public:
     WINDOW_PROPERTIES screen;
     WINDOW_PROPERTIES help;
     WINDOW_PROPERTIES status;
+    WINDOW_PROPERTIES mock_menu;
     WINDOW_PROPERTIES entry;
     WINDOW_PROPERTIES history;
 
@@ -104,7 +128,7 @@ public:
         help.x = screen.columns - help.columns;
         help_window = newwin(help.rows, help.columns, help.y, help.x);
         wmove(help_window, 0, 0);
-        wprintw(help_window, help_text[Mode::Command].toUtf8().data());
+        wprintw(help_window, help_text[Mode::Command].toUtf8());
         wrefresh(help_window);
 
         // create window to display connection status with zBus
@@ -115,6 +139,7 @@ public:
         status_window = newwin(status.rows, status.columns, status.y, status.x);
 
         // create field for input of event sender and event type
+        // TODO: standardize rows definition (used space + gap, or just used space?)
         QString event_label = "event";
         int event_rows = 1;
         int event_columns = screen.columns - (event_label.size() + 1);
@@ -127,21 +152,34 @@ public:
         field_opts_off(entry_fields[0], O_BLANK);
         field_opts_off(entry_fields[0], O_WRAP);
 
-        // create field for input of event data
-        QString data_label = "data";
-        int data_rows = 5;
-        int data_columns = screen.columns - (data_label.size() + 1);
-        int data_y = event_y + event_rows + 1;
-        int data_x = screen.columns - data_columns;
-        entry_fields[1] = new_field(data_rows, data_columns, data_y, data_x, 0, 0);
+        // create field for input of requestId
+        QString request_id_label = "requestId";
+        int request_id_rows = 1;
+        int request_id_columns = screen.columns - (request_id_label.size() + 1);
+        int request_id_y = event_y + event_rows + 1;
+        int request_id_x = screen.columns - request_id_columns;
+        entry_fields[1] = new_field(request_id_rows, request_id_columns, request_id_y, request_id_x, 0, 0);
         set_field_back(entry_fields[1], A_UNDERLINE);
         field_opts_off(entry_fields[1], O_AUTOSKIP);
         field_opts_off(entry_fields[1], O_STATIC);
         field_opts_off(entry_fields[1], O_BLANK);
         field_opts_off(entry_fields[1], O_WRAP);
 
+        // create field for input of event data
+        QString data_label = "data";
+        int data_rows = 5;
+        int data_columns = screen.columns - (data_label.size() + 1);
+        int data_y = request_id_y + request_id_rows + 1;
+        int data_x = screen.columns - data_columns;
+        entry_fields[2] = new_field(data_rows, data_columns, data_y, data_x, 0, 0);
+        set_field_back(entry_fields[2], A_UNDERLINE);
+        field_opts_off(entry_fields[2], O_AUTOSKIP);
+        field_opts_off(entry_fields[2], O_STATIC);
+        field_opts_off(entry_fields[2], O_BLANK);
+        field_opts_off(entry_fields[2], O_WRAP);
+
         // create window to contain event entry form
-        entry.rows = (event_rows + 1) + (data_rows + 1);
+        entry.rows = (event_rows + 1) + (request_id_rows + 1) + (data_rows + 1);
         entry.columns = screen.columns;
         entry.y = status.y + status.rows;
         entry.x = screen.columns - entry.columns;
@@ -156,13 +194,34 @@ public:
 
         // add labels for event entry fields
         wmove(entry_window, 0, 0);
-        wprintw(entry_window, "event");
+        wprintw(entry_window, event_label.toUtf8());
         wmove(entry_window, 2, 0);
-        wprintw(entry_window, "data");
+        wprintw(entry_window, request_id_label.toUtf8());
+        wmove(entry_window, 4, 0);
+        wprintw(entry_window, data_label.toUtf8());
         wrefresh(entry_window);
 
+        // create window to display connection status with zBus
+        mock_menu.rows = 6;
+        mock_menu.columns = screen.columns;
+        mock_menu.y = status.y + status.rows;
+        mock_menu.x = screen.columns - mock_menu.columns;
+        mock_menu_window = newwin(mock_menu.rows, mock_menu.columns, mock_menu.y, mock_menu.x);
+        wprintw(mock_menu_window, mock_menu_text["main"].toUtf8());
+        wrefresh(mock_menu_window);
+
+        // create window to display connection status with zBus
+        mock_menu.rows = 6;
+        mock_menu.columns = screen.columns;
+        mock_menu.y = status.y + status.rows;
+        mock_menu.x = screen.columns - mock_menu.columns;
+        mock_menu_window = newwin(mock_menu.rows, mock_menu.columns, mock_menu.y, mock_menu.x);
+        wprintw(mock_menu_window, mock_menu_text["main"].toUtf8());
+        wrefresh(mock_menu_window);
+
+
         // create window for event history, using the remaining rows in the screen
-        history.rows = screen.rows - (status.y + status.rows);
+        history.rows = screen.rows - (mock_menu.y + mock_menu.rows);
         history.columns = screen.columns;
         history.y = screen.rows - history.rows;
         history.x = screen.columns - history.columns;
@@ -178,14 +237,16 @@ public:
     ~ZBusCliPrivate()
     {
         delwin(help_window);
-        delwin(entry_window);
-        delwin(entry_subwindow);
         delwin(status_window);
+        delwin(entry_subwindow);
+        delwin(entry_window);
+        delwin(mock_menu_window);
         delwin(history_window);
 
         free_form(entry_form);
         free_field(entry_fields[0]);
         free_field(entry_fields[1]);
+        free_field(entry_fields[2]);
 
         endwin();
     }
@@ -291,8 +352,8 @@ public:
             {
                 wattron(history_window, A_BOLD);
             }
-            wprintw(history_window, prefix.toUtf8().data());
-            wprintw(history_window, json.toUtf8().data());
+            wprintw(history_window, prefix.toUtf8());
+            wprintw(history_window, json.toUtf8());
             wattroff(history_window, A_BOLD);
 
             // set row for next event immediately after current event
@@ -312,7 +373,7 @@ public:
         // TODO: handle multiline help text
         wmove(help_window, 0, 0);
         wclear(help_window);
-        wprintw(help_window, help_text[mode].toUtf8().data());
+        wprintw(help_window, help_text[mode].toUtf8());
         wrefresh(help_window);
     }
 
@@ -325,20 +386,37 @@ public:
      */
     void resize_history_window(Mode mode)
     {
-        history.rows = (mode == Mode::Send) ? screen.rows - (entry.y + entry.rows)
-                                            : screen.rows - (status.y + status.rows);
+        switch(mode)
+        {
+            case Mode::Command:
+                redrawwin(mock_menu_window);
+                wrefresh(mock_menu_window);
+                history.rows = screen.rows - (mock_menu.y + mock_menu.rows);
+                break;
+            case Mode::Send:
+                redrawwin(entry_window);
+                history.rows = screen.rows - (entry.y + entry.rows);
+                break;
+            default:
+                history.rows = screen.rows - (status.y + status.rows);
+                break;
+        }
+
         history.y = screen.rows - history.rows;
 
         wresize(history_window, history.rows, history.columns);
         mvwin(history_window, history.y, history.x);
         wrefresh(history_window);
-
-        // display the entry window if it is no longer overlapped by the history window
-        if (mode == Mode::Send)
-        {
-            redrawwin(entry_window);
-        }
     }
+
+    void insert_event(ZBusEvent event)
+    {
+        set_field_buffer(entry_fields[0], 0, event.name().toUtf8());
+        set_field_buffer(entry_fields[1], 0, event.requestId.toUtf8());
+        set_field_buffer(entry_fields[2], 0, event.dataString().toUtf8());
+    }
+
+    //TODO: menu to display hotkeys for quick events
 };
 
 /* \brief Constructs an instance of ZBusCli, setting up the retry logic and the connections between
@@ -395,13 +473,19 @@ void ZBusCli::onDisconnected()
  *        to enable sending events from the text-based UI.
  *
  * \param <event> String containing the event sender and event type.
+ * \param <event> String containing the requestId of the event.
  * \param <data> String containing the event data.
  *
  * \returns Number of bytes sent.
  */
-qint64 ZBusCli::onEventSubmitted(const QString &event, const QString &data)
+qint64 ZBusCli::onEventSubmitted(const QString &event, const QString &data, const QString &requestId)
 {
-  ZBusEvent zBusEvent = ZBusEvent(event.trimmed(), data.trimmed());
+  // store data as appropriate type of JSON value;
+  // if the data is not an object or array, it is assumed that it is a string
+  QJsonDocument dataDoc = QJsonDocument::fromJson(data.trimmed().toUtf8());
+  QJsonValue json = dataDoc.isNull() ? data.trimmed() : QJsonValue::fromVariant(dataDoc.toVariant());
+
+  ZBusEvent zBusEvent(event.trimmed(), json, requestId.trimmed());
   p->event_history.append({Origin::Sent, zBusEvent});
   return p->client.sendZBusEvent(zBusEvent);
 }
@@ -409,13 +493,25 @@ qint64 ZBusCli::onEventSubmitted(const QString &event, const QString &data)
 /* \brief Stores the given event in the event_history list.
  *
  *        This is connected to ZWebSocket's zBusEventReceived signal in order to save all received
- *        events.
+ *        events, and keep track of the current requestId and authAttemptId expected from mock
+ *        pinpad events.
  *
  * \param <event> Event received from zBus.
  */
 void ZBusCli::onZBusEventReceived(const ZBusEvent &event)
 {
   p->event_history.append({Origin::Received, event});
+
+  // if the received event contains a requestId,
+  // update the stored requestId for mock events
+  p->current_request_id = event.requestId.isEmpty() ? p->current_request_id
+                                                  : event.requestId;
+
+  // if the received event contains an authAttemptId,
+  // update the stored authAttemptId for mock events
+  const QString auth_attempt_id = event.data.toObject().value("authAttemptId").toString();
+  p->current_auth_attempt_id = auth_attempt_id.isEmpty() ? p->current_auth_attempt_id
+                                                       : auth_attempt_id;
 }
 
 /* \brief Starts an infinite loop that waits for input, processes pending Qt events, and updates the
@@ -435,7 +531,7 @@ void ZBusCli::startEventLoop()
 
     // process input with current mode, and capture next mode for next input
     int next_selection = current_selection;
-    Mode next_mode = current_mode;
+    Mode next_mode = current_mode; //TODO: remove concept of next_mode, simply have `mode` and fewer forks
     switch(current_mode)
     {
         case Mode::Command:
@@ -489,7 +585,7 @@ void ZBusCli::startEventLoop()
         wclrtoeol(p->status_window);
         wattron(p->status_window, COLOR_PAIR(RED_TEXT) | A_BOLD);
         wprintw(p->status_window, "error: ");
-        wprintw(p->status_window, p->client.errorString().toUtf8().data());
+        wprintw(p->status_window, p->client.errorString().toUtf8());
         wattroff(p->status_window, COLOR_PAIR(RED_TEXT) | A_BOLD);
         wrefresh(p->status_window);
     }
@@ -532,6 +628,12 @@ Mode ZBusCli::handle_command_input(int input)
 {
     switch(input)
     {
+        case '1':
+            p->insert_event({MockName::printerConnected,
+                             p->current_request_id,
+                             p->current_auth_attempt_id});
+            return Mode::Send;
+
         case 's':
             return Mode::Send;
 
@@ -569,7 +671,9 @@ Mode ZBusCli::handle_send_input(int input)
         case '\n':
         case KEY_ENTER:
             form_driver(p->entry_form, REQ_VALIDATION);
-            emit eventSubmitted(field_buffer(p->entry_fields[0], 0), field_buffer(p->entry_fields[1], 0));
+            emit eventSubmitted(field_buffer(p->entry_fields[0], 0),
+                                field_buffer(p->entry_fields[2], 0),
+                                field_buffer(p->entry_fields[1], 0));
             break;
 
         // on Backspace, backspace

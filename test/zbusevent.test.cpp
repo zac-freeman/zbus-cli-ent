@@ -8,18 +8,20 @@ class ZBusEventTest : public QObject
   Q_OBJECT
 
 private slots:
-  void fromValidJson()
+  void fromJson()
   {
-    ZBusEvent event(validJson);
+    const QJsonObject json = QJsonDocument::fromJson(validJson.toUtf8()).object();
+    const ZBusEvent event(json);
     QCOMPARE(event.sender, QString("test-sender"));
     QCOMPARE(event.type, QString("test-type"));
     QCOMPARE(event.data.toString(), QString("test-data"));
     QCOMPARE(event.requestId, QString("test-request-id"));
   }
 
-  void fromInvalidJson()
+  void fromEmptyJson()
   {
-    ZBusEvent event(invalidJson);
+    const QJsonObject json;
+    const ZBusEvent event(json);
     QCOMPARE(event.sender, QString(""));
     QCOMPARE(event.type, QString(""));
     QCOMPARE(event.data.toString(), QString(""));
@@ -28,9 +30,9 @@ private slots:
 
   void fromEventAndData()
   {
-    ZBusEvent event("test-sender.test-type",
-                    "test-data",
-                    "test-request-id");
+    const ZBusEvent event("test-sender.test-type",
+                          "test-data",
+                          "test-request-id");
     QCOMPARE(event.sender, QString("test-sender"));
     QCOMPARE(event.type, QString("test-type"));
     QCOMPARE(event.data.toString(), QString("test-data"));
@@ -53,8 +55,10 @@ private:
       "\"event\":\"test-sender.test-type\","
       "\"requestId\":\"test-request-id\""
   "}"};
-  const QString invalidJson{"{\"data\":\"test-data\",\"event\":\""};
 };
+
+//TODO: ensure ZBusEvent constructor correctly infers type of QJsonValue given (and doesn't just
+//      assume everything is a string)
 
 QTEST_GUILESS_MAIN(ZBusEventTest);
 #include "zbusevent.test.moc"

@@ -2,7 +2,33 @@
 #define ZBUS_EVENT_H
 
 #include <QJsonValue>
+#include <QJsonObject>
 #include <QString>
+
+enum class MockName
+{
+    // pinpad events
+    pinpadCardDeclined,
+    pinpadCardInfo,
+    pinpadCardInserted,
+    pinpadCardReadError,
+    pinpadCardRemoved,
+    pinpadCustomerInfoRequestSucceeded,
+    pinpadDisplayItemFailure,
+    pinpadDisplayItemSuccess,
+    pinpadFinishPaymentRequest,
+    pinpadPaymentAccepted,
+
+    // printer events
+    printerConnected,
+    printerDisconnected,
+    printerDrawerClosed,
+    printerDrawerOpened,
+
+    // scanner events
+    scannerRead,
+    scannerReadPCI
+};
 
 /* Representation of the (extended) JSON format for events received and broadcasted by zBus. The
  * event data may contain an `authAttemptId`. The fields `requestId` and `authAttemptId` are used
@@ -20,12 +46,17 @@
 class ZBusEvent
 {
 public:
-  ZBusEvent(const QString &json = QString());
+  ZBusEvent(const QJsonObject &json = QJsonObject());
   ZBusEvent(const QString &event,
-            const QString &data,
+            const QJsonValue &data = QJsonValue(),
             const QString &requestId = QString());
+  ZBusEvent(enum MockName mockName,
+            const QString &requestId = QString(),
+            const QString &authAttemptId = QString());
 
   QString toJson() const;
+  QString name() const;
+  QString dataString() const;
 
   QString sender;
   QString type;

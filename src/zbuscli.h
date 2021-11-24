@@ -36,11 +36,11 @@ public:
   PeruseResult handle_peruse_input(int input, int selection);
 
 signals:
-  void eventSubmitted(const QString &event, const QString &data);
+  void eventSubmitted(const QString &event, const QString &data, const QString &requestId);
 
 private slots:
   void onDisconnected();
-  qint64 onEventSubmitted(const QString &event, const QString &data);
+  qint64 onEventSubmitted(const QString &event, const QString &data, const QString &requestId);
   void onZBusEventReceived(const ZBusEvent &event);
 
 private:
