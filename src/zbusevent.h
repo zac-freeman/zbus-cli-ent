@@ -5,29 +5,32 @@
 #include <QJsonObject>
 #include <QString>
 
-enum class MockName
+enum class Mock
 {
+    // nuffin
+    None,
+
     // pinpad events
-    pinpadCardDeclined,
-    pinpadCardInfo,
-    pinpadCardInserted,
-    pinpadCardReadError,
-    pinpadCardRemoved,
-    pinpadCustomerInfoRequestSucceeded,
-    pinpadDisplayItemFailure,
-    pinpadDisplayItemSuccess,
-    pinpadFinishPaymentRequest,
-    pinpadPaymentAccepted,
+    PinpadCardDeclined,
+    PinpadCardInfo,
+    PinpadCardInserted,
+    PinpadCardReadError,
+    PinpadCardRemoved,
+    PinpadCustomerInfoRequestSucceeded,
+    PinpadDisplayItemFailure,
+    PinpadDisplayItemSuccess,
+    PinpadFinishPaymentRequest,
+    PinpadPaymentAccepted,
 
     // printer events
-    printerConnected,
-    printerDisconnected,
-    printerDrawerClosed,
-    printerDrawerOpened,
+    PrinterConnected,
+    PrinterDisconnected,
+    PrinterDrawerClosed,
+    PrinterDrawerOpened,
 
     // scanner events
-    scannerRead,
-    scannerReadPCI
+    ScannerRead,
+    ScannerReadPCI
 };
 
 /* Representation of the (extended) JSON format for events received and broadcasted by zBus. The
@@ -50,7 +53,7 @@ public:
   ZBusEvent(const QString &event,
             const QJsonValue &data = QJsonValue(),
             const QString &requestId = QString());
-  ZBusEvent(enum MockName mockName,
+  ZBusEvent(enum Mock name,
             const QString &requestId = QString(),
             const QString &authAttemptId = QString());
 

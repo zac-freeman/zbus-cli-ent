@@ -12,6 +12,7 @@
 #include <QPair>
 #include <QTimer>
 #include <QQueue>
+#include <QVector>
 
 // ncurses libraries
 #include <form.h>
@@ -48,24 +49,94 @@ static const QMap<Mode, QString> help_text
     { Mode::Peruse, "Ctrl+C) exit program, Esc) begin command mode" }
 };
 
-static const QMap<QString, QString> mock_menu_text
+struct MockMenuEntry
 {
+    QString text;
+    enum Menu menu = Menu::None;
+    enum Mock mock = Mock::None;
+
+    MockMenuEntry() {}
+
+    MockMenuEntry(const QString &text, enum Menu menu) : text(text), menu(menu) {}
+
+    MockMenuEntry(const QString &text, enum Mock mock) : text(text), mock(mock) {}
+};
+
+static const QMap<Menu, QVector<MockMenuEntry>> mock_menu_entries
+{
+    { Menu::None, {} },
     {
-        "main",
-        "1. pinpad\n"
-        "2. printer\n"
-        "3. scanner"
+        Menu::Main,
+        {
+            { "pinpad", Menu::Pinpad },
+            { "printer", Menu::Printer },
+            { "scanner", Menu::Scanner }
+        }
     },
     {
-        "pinpad",
-        "1. card\n"
-        "2. other\n"
-        "0. back"
+        Menu::Pinpad,
+        {
+            { "card", Menu::PinpadCard },
+            { "payment", Menu::PinpadPayment },
+            { "other", Menu::PinpadOther },
+            { "back", Menu::Main }
+        }
+    },
+    {
+        Menu::Printer,
+        {
+            { "connected", Mock::PrinterConnected },
+            { "disconnected", Mock::PrinterDisconnected },
+            { "drawer opened", Mock::PrinterDrawerOpened },
+            { "drawer closed", Mock::PrinterDrawerClosed },
+            { "back", Menu::Main }
+        }
+    },
+    {
+        Menu::Scanner,
+        {
+            { "read", Mock::ScannerRead },
+            { "read PCI", Mock::ScannerReadPCI },
+            { "back", Menu::Main }
+        }
+    },
+    {
+        Menu::PinpadCard,
+        {
+            { "card inserted", Mock::PinpadCardInserted },
+            { "card read", Mock::PinpadCardInfo },
+            { "card read failed", Mock::PinpadCardReadError },
+            { "card declined", Mock::PinpadCardDeclined },
+            { "card removed", Mock::PinpadCardRemoved },
+            { "back", Menu::Pinpad }
+        }
+    },
+    {
+        Menu::PinpadPayment,
+        {
+            { "finish transaction", Mock::PinpadFinishPaymentRequest },
+            { "payment accepted", Mock::PinpadPaymentAccepted },
+            { "back", Menu::Pinpad }
+        }
+    },
+    {
+        Menu::PinpadOther,
+        {
+            { "customer info request succeeded", Mock::PinpadCustomerInfoRequestSucceeded },
+            { "item displayed", Mock::PinpadDisplayItemSuccess },
+            { "item display failed", Mock::PinpadDisplayItemFailure },
+            { "back", Menu::Pinpad }
+        }
     }
 };
 
-// Used for multiple return from handle_peruse_input
-struct PeruseResult { Mode mode; int selection; };
+
+struct State
+{
+    Mode mode;
+    Menu menu;
+    int selection;
+};
 
 // Stores the dimension and position of an ncurses WINDOW object.
 struct WINDOW_PROPERTIES
@@ -201,24 +272,13 @@ public:
         wprintw(entry_window, data_label.toUtf8());
         wrefresh(entry_window);
 
-        // create window to display connection status with zBus
-        mock_menu.rows = 6;
+        // create window to display mock menu entries
+        mock_menu.rows = 7;
         mock_menu.columns = screen.columns;
         mock_menu.y = status.y + status.rows;
         mock_menu.x = screen.columns - mock_menu.columns;
         mock_menu_window = newwin(mock_menu.rows, mock_menu.columns, mock_menu.y, mock_menu.x);
-        wprintw(mock_menu_window, mock_menu_text["main"].toUtf8());
-        wrefresh(mock_menu_window);
-
-        // create window to display connection status with zBus
-        mock_menu.rows = 6;
-        mock_menu.columns = screen.columns;
-        mock_menu.y = status.y + status.rows;
-        mock_menu.x = screen.columns - mock_menu.columns;
-        mock_menu_window = newwin(mock_menu.rows, mock_menu.columns, mock_menu.y, mock_menu.x);
-        wprintw(mock_menu_window, mock_menu_text["main"].toUtf8());
-        wrefresh(mock_menu_window);
-
+        update_mock_menu(Menu::Main);
 
         // create window for event history, using the remaining rows in the screen
         history.rows = screen.rows - (mock_menu.y + mock_menu.rows);
@@ -416,7 +476,20 @@ public:
         set_field_buffer(entry_fields[2], 0, event.dataString().toUtf8());
     }
 
-    //TODO: menu to display hotkeys for quick events
+    void update_mock_menu(Menu menu)
+    {
+        QVector<MockMenuEntry> entries = mock_menu_entries[menu];
+
+        wclear(mock_menu_window);
+        for (int i = 0; i < entries.size(); i++)
+        {
+            wmove(mock_menu_window, i + 1, 0);
+            wprintw(mock_menu_window, QByteArray::number(i + 1));
+            wprintw(mock_menu_window, ") ");
+            wprintw(mock_menu_window, entries[i].text.toUtf8());
+        }
+        wrefresh(mock_menu_window);
+    }
 };
 
 /* \brief Constructs an instance of ZBusCli, setting up the retry logic and the connections between
@@ -520,44 +593,45 @@ void ZBusCli::onZBusEventReceived(const ZBusEvent &event)
 void ZBusCli::startEventLoop()
 {
   int current_size = 0; // size of event_history during previous cycle of event loop
-  int current_selection = -1; // the index of the event in event_history to be selected; -1 == none
   int current_top = 0; // the index of the event in event_history at the top of the history window
-  Mode current_mode = Mode::Command; // the mode for processing fresh input
+  State current { Mode::Command, Menu::Main, -1 };
 
   // capture input, process pending Qt events, then update the display
   while (true)
   {
     int input = wgetch(p->entry_window);
 
-    // process input with current mode, and capture next mode for next input
-    int next_selection = current_selection;
-    Mode next_mode = current_mode; //TODO: remove concept of next_mode, simply have `mode` and fewer forks
-    switch(current_mode)
+    // process input with current state, and capture next state for next input
+    State next { current.mode, current.menu, current.selection };
+    switch(current.mode)
     {
         case Mode::Command:
-            next_mode = handle_command_input(input);
+            next = handle_command_input(input, current.menu, current.selection);
             break;
 
         case Mode::Send:
-            next_mode = handle_send_input(input);
+            next = handle_send_input(input, current.menu, current.selection);
             break;
 
         case Mode::Peruse:
-            PeruseResult result = handle_peruse_input(input, current_selection);
-            next_mode = result.mode;
-            next_selection = result.selection;
+            next = handle_peruse_input(input, current.menu, current.selection);
             break;
     }
 
     // before updating the display, process pending Qt events
     QCoreApplication::processEvents();
 
+    if (current.menu != next.menu)
+    {
+        p->update_mock_menu(next.menu);
+    }
+
     // if the mode has changed, update the help text and resize the history to fill the available
     // space
-    if (current_mode != next_mode)
+    if (current.mode != next.mode)
     {
-        p->update_help_text(next_mode);
-        p->resize_history_window(next_mode);
+        p->update_help_text(next.mode);
+        p->resize_history_window(next.mode);
     }
 
     // update the connection status message
@@ -593,19 +667,18 @@ void ZBusCli::startEventLoop()
     // if any new events have been received, or the event selection has changed,
     // update the event history
     int next_size = p->event_history.size();
-    if (next_selection != current_selection || next_size > current_size)
+    if (next.selection != current.selection || next_size > current_size)
     {
-        int next_top = p->find_top_for_selection(current_top, next_selection);
-        p->update_history_window(next_top, next_selection);
+        int next_top = p->find_top_for_selection(current_top, next.selection);
+        p->update_history_window(next_top, next.selection);
 
         current_size = next_size;
-        current_selection = next_selection;
         current_top = next_top;
     }
 
     // if entry fields are visible, return cursor to last position in current field
     // otherwise, hide the cursor
-    if (next_mode == Mode::Send)
+    if (next.mode == Mode::Send)
     {
         curs_set(1);
         pos_form_cursor(p->entry_form);
@@ -613,8 +686,8 @@ void ZBusCli::startEventLoop()
         curs_set(0);
     }
 
-    // update mode for processing next input
-    current_mode = next_mode;
+    // update state for processing next input
+    current = next;
   }
 }
 
@@ -624,24 +697,52 @@ void ZBusCli::startEventLoop()
  *
  * \returns The Mode that further input should be processed with.
  */
-Mode ZBusCli::handle_command_input(int input)
+State ZBusCli::handle_command_input(int input, Menu current_menu, int selection)
 {
     switch(input)
     {
+        case '0':
         case '1':
-            p->insert_event({MockName::printerConnected,
-                             p->current_request_id,
-                             p->current_auth_attempt_id});
-            return Mode::Send;
+        case '2':
+        case '3':
+        case '4':
+        case '5':
+        case '6':
+        case '7':
+        case '8':
+        case '9':
+            {
+                int index = QByteArray(1, input).toInt() - 1;
+                MockMenuEntry entry = mock_menu_entries[current_menu].value(index); //TODO: replace operator[] with .at() and .value() everywhere
+
+                // if the selection refers to another menu, display the next menu
+                if (entry.menu != Menu::None)
+                {
+                    return { Mode::Command, entry.menu, selection };
+                }
+
+                // if the selection refers to a mock event, insert the mock event
+                if (entry.mock != Mock::None)
+                {
+                    p->insert_event({entry.mock,
+                                     p->current_request_id,
+                                     p->current_auth_attempt_id});
+                    return { Mode::Send, Menu::Main, selection };
+                }
+
+                // if the selection refers neither a menu or a mock event, the selection is invalid;
+                // do nothing
+                return { Mode::Command, current_menu, selection };
+            }
 
         case 's':
-            return Mode::Send;
+            return { Mode::Send, Menu::Main, selection };
 
         case 'p':
-            return Mode::Peruse;
+            return { Mode::Peruse, Menu::Main, selection };
 
         default:
-            return Mode::Command;
+            return { Mode::Command, current_menu, selection };
     }
 }
 
@@ -651,7 +752,7 @@ Mode ZBusCli::handle_command_input(int input)
  *
  * \returns The Mode that further input should be processed with.
  */
-Mode ZBusCli::handle_send_input(int input)
+State ZBusCli::handle_send_input(int input, Menu current_menu, int selection)
 {
     switch(input)
     {
@@ -690,7 +791,7 @@ Mode ZBusCli::handle_send_input(int input)
             // subsequent input
             if (input != '[')
             {
-                return handle_command_input(input);
+                return handle_command_input(input, current_menu, selection);
             }
 
             // it's an "Escape Sequence"; on Arrow Key, move cursor (arrow keys are received in the
@@ -721,7 +822,7 @@ Mode ZBusCli::handle_send_input(int input)
             form_driver(p->entry_form, input);
     }
 
-    return Mode::Send;
+    return { Mode::Send, current_menu, selection};
 }
 
 /* \brief Handles input received while the client is in Peruse mode.
@@ -730,7 +831,7 @@ Mode ZBusCli::handle_send_input(int input)
  *
  * \returns The Mode that further input should be processed with.
  */
-PeruseResult ZBusCli::handle_peruse_input(int input, int selection)
+State ZBusCli::handle_peruse_input(int input, Menu current_menu, int selection)
 {
     switch(input)
     {
@@ -742,14 +843,14 @@ PeruseResult ZBusCli::handle_peruse_input(int input, int selection)
             // selection, and process subsequent input
             if (input != '[')
             {
-                return { handle_command_input(input), -1};
+                return handle_command_input(input, current_menu, -1);
             }
 
 
             // if the event history is empty, ignore selections
             if (p->event_history.empty())
             {
-                return { Mode::Peruse, -1 };
+                return { Mode::Peruse, current_menu, -1 };
             }
 
             // it's an "Escape Sequence"; on Arrow Key, select another event (arrow keys are
@@ -762,17 +863,18 @@ PeruseResult ZBusCli::handle_peruse_input(int input, int selection)
                     // wrap around to latest event if no event or the last event is selected
                     if (selection == -1 || selection == latest_event)
                     {
-                        return { Mode::Peruse, 0 };
+                        return { Mode::Peruse, current_menu, 0 };
                     }
 
-                    return { Mode::Peruse, selection + 1};
+                    return { Mode::Peruse, current_menu, selection + 1};
                 // Down
                 case 'B':
                     // wrap around to latest event if first event is selected
-                    return { Mode::Peruse, selection > 0 ? selection - 1 : latest_event };
+                    selection = selection > 0 ? selection - 1 : latest_event;
+                    return { Mode::Peruse, current_menu, selection };
             }
             break;
     }
 
-    return { Mode::Peruse, selection };
+    return { Mode::Peruse, current_menu, selection };
 }

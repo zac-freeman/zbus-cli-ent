@@ -7,32 +7,35 @@
 #include <QStringList>
 #include <QVariant>
 
-static const QMap<MockName, ZBusEvent> mockEvent
+static const QMap<Mock, ZBusEvent> mockEvent
 {
+    // nuffin
+    { Mock::None, {} },
+
     // pinpad events
-    { MockName::pinpadCardDeclined, { "pinpad.paymentError", MOCK_CARD_INFO } },
-    { MockName::pinpadCardInfo, { "pinpad.cardInfo", MOCK_CARD_INFO } },
-    { MockName::pinpadCardInserted, { "pinpad.cardInserted" } },
-    { MockName::pinpadCardReadError, { "pinpad.cardReadError", MOCK_CARD_INFO } },
-    { MockName::pinpadCardRemoved, { "pinpad.cardRemoved" } },
+    { Mock::PinpadCardDeclined, { "pinpad.paymentError", MOCK_CARD_INFO } },
+    { Mock::PinpadCardInfo, { "pinpad.cardInfo", MOCK_CARD_INFO } },
+    { Mock::PinpadCardInserted, { "pinpad.cardInserted" } },
+    { Mock::PinpadCardReadError, { "pinpad.cardReadError", MOCK_CARD_INFO } },
+    { Mock::PinpadCardRemoved, { "pinpad.cardRemoved" } },
     {
-        MockName::pinpadCustomerInfoRequestSucceeded,
+        Mock::PinpadCustomerInfoRequestSucceeded,
         { "pinpad.customerInfoRequestSucceeded", MOCK_CUSTOMER_INFO }
     },
-    { MockName::pinpadDisplayItemFailure, { "pinpad.displayItemFailure" } },
-    { MockName::pinpadDisplayItemSuccess, { "pinpad.displayItemSuccess" } },
-    { MockName::pinpadFinishPaymentRequest, { "pinpad.finishPaymentRequest" } },
-    { MockName::pinpadPaymentAccepted, { "pinpad.paymentAccepted", MOCK_CARD_INFO } },
+    { Mock::PinpadDisplayItemFailure, { "pinpad.displayItemFailure" } },
+    { Mock::PinpadDisplayItemSuccess, { "pinpad.displayItemSuccess" } },
+    { Mock::PinpadFinishPaymentRequest, { "pinpad.finishPaymentRequest" } },
+    { Mock::PinpadPaymentAccepted, { "pinpad.paymentAccepted", MOCK_CARD_INFO } },
 
     // printer events
-    { MockName::printerConnected, { "printer.stateUpdate", MOCK_PRINTER_CONNECTED_STATE } },
-    { MockName::printerDisconnected, { "printer.stateUpdate", MOCK_PRINTER_DISCONNECTED_STATE } },
-    { MockName::printerDrawerClosed, { "printer.stateUpdate", MOCK_PRINTER_CONNECTED_STATE } },
-    { MockName::printerDrawerOpened, { "printer.stateUpdate", MOCK_DRAWER_OPEN_STATE } },
+    { Mock::PrinterConnected, { "printer.stateUpdate", MOCK_PRINTER_CONNECTED_STATE } },
+    { Mock::PrinterDisconnected, { "printer.stateUpdate", MOCK_PRINTER_DISCONNECTED_STATE } },
+    { Mock::PrinterDrawerClosed, { "printer.stateUpdate", MOCK_PRINTER_CONNECTED_STATE } },
+    { Mock::PrinterDrawerOpened, { "printer.stateUpdate", MOCK_DRAWER_OPEN_STATE } },
 
     // scanner events
-    { MockName::scannerRead, { "scanner.read" } },
-    { MockName::scannerReadPCI, { "scanner.read", MOCK_PCI } }
+    { Mock::ScannerRead, { "scanner.read" } },
+    { Mock::ScannerReadPCI, { "scanner.read", MOCK_PCI } }
 };
 
 /* \brief Constructs a ZBusEvent from a json object. If a field can not be extracted from
@@ -67,7 +70,7 @@ ZBusEvent::ZBusEvent(const QString &event,
   this->requestId = requestId;
 }
 
-ZBusEvent::ZBusEvent(enum MockName name,
+ZBusEvent::ZBusEvent(enum Mock name,
                      const QString &requestId,
                      const QString &authAttemptId)
 {

@@ -3,7 +3,7 @@
 
 #include <QObject>
 
-class PeruseResult;
+class State;
 class ZBusCliPrivate;
 class ZBusEvent;
 
@@ -16,6 +16,8 @@ class ZBusEvent;
  *
  */
 enum class Mode { Command, Send, Peruse };
+
+enum class Menu { None, Main, Pinpad, Printer, Scanner, PinpadCard, PinpadPayment, PinpadOther };
 
 /* Bridge between the ZWebSocket sending and receiving events, and the ncurses event loop displaying
  * the events and accepting input from the user.
@@ -31,9 +33,9 @@ public:
 
   void exec(const QUrl &zBusUrl);
   void startEventLoop();
-  enum Mode handle_command_input(int input);
-  enum Mode handle_send_input(int input);
-  PeruseResult handle_peruse_input(int input, int selection);
+  State handle_command_input(int input, enum Menu current_menu, int selection);
+  State handle_peruse_input(int input, enum Menu current_menu, int selection);
+  State handle_send_input(int input, enum Menu current_menu, int selection);
 
 signals:
   void eventSubmitted(const QString &event, const QString &data, const QString &requestId);
