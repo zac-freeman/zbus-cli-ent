@@ -117,7 +117,7 @@ QString ZBusEvent::toJson() const
  */
 QString ZBusEvent::name() const
 {
-    return sender + "." + type;
+    return sender + ((sender.isEmpty() || type.isEmpty()) ? "" : ".") + type;
 }
 
 /* \brief Creates a JSON-formatted string from the event data.
