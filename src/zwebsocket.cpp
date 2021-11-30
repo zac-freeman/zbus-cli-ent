@@ -87,10 +87,9 @@ qint64 ZWebSocket::sendZBusEvent(const ZBusEvent &event)
 qint64 ZWebSocket::sendZBusEvents(const QStringList &events)
 {
     QList<ZBusEvent> zBusEvents;
-    QString event;
-    foreach(event, events)
+    foreach(const QString &event, events)
     {
-        zBusEvents.append(event);
+        zBusEvents.append(QJsonDocument::fromJson(event.toUtf8()).object());
     }
 
     return sendZBusEvents(zBusEvents);
