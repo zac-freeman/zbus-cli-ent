@@ -54,11 +54,11 @@ class ZBusEvent
 public:
     ZBusEvent(const QJsonObject &json = QJsonObject());
     ZBusEvent(const QString &event,
-            const QJsonValue &data = QJsonValue(),
-            const QString &requestId = QString());
+              const QJsonValue &data = QJsonValue(),
+              const QString &requestId = QString());
     ZBusEvent(enum Mock name,
-            const QString &requestId = QString(),
-            const QString &authAttemptId = QString());
+              const QString &requestId = QString(),
+              const QString &authAttemptId = QString());
 
     QString toJson() const;
     QString name() const;
