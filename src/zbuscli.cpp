@@ -49,6 +49,14 @@ static const QMap<Mode, QString> help_text
     { Mode::Peruse, "Ctrl+C) exit program, Esc) begin command mode" }
 };
 
+/* A container for the data associated with each entry in the mock menu. An instance of
+ * `MockMenuEntry` should set EXACTLY ONE OF its `menu` and `mock` members. The unset value should
+ * be set to its "None" value.
+ *
+ * This type handles the fact that a menu entry can point to EITHER another menu OR a mocked event.
+ * Encapsulating that behavior in this type reduces the complexity of the structure representing the
+ * mock menu.
+ */
 struct MockMenuEntry
 {
     QString text;
@@ -57,11 +65,17 @@ struct MockMenuEntry
 
     MockMenuEntry() {}
 
-    MockMenuEntry(const QString &text, enum Menu menu) : text(text), menu(menu) {}
+    MockMenuEntry(const QString &text, enum Menu menu) : text(text), menu(menu), mock(Mock::None) {}
 
-    MockMenuEntry(const QString &text, enum Mock mock) : text(text), mock(mock) {}
+    MockMenuEntry(const QString &text, enum Mock mock) : text(text), menu(Menu::None), mock(mock) {}
 };
 
+/* Maps each `Menu` value to a list of `MockMenuEntry`s. This map represents a tree (excluding the
+ * cycles introduced by the "back" option) where branches point to lists of mock menu entries, and
+ * leaves point to a mock event.
+ *
+ * Each menu (besides the root/main menu) should contain a "back" option.
+ */
 static const QMap<Menu, QVector<MockMenuEntry>> mock_menu_entries
 {
     { Menu::None, {} },
@@ -130,7 +144,8 @@ static const QMap<Menu, QVector<MockMenuEntry>> mock_menu_entries
     }
 };
 
-
+// The context with which the input handler should handle input.
+// TODO: rename to "Context"?
 struct State
 {
     Mode mode;
@@ -147,13 +162,17 @@ struct WINDOW_PROPERTIES
     int x;
 };
 
+/* The private implementation for `ZBusCli`. Contains logic for handling inbound/outbound zBus
+ * events, user input, and the UI.
+ *
+ */
 class ZBusCliPrivate
 {
 public:
-    QList<QPair<Origin, ZBusEvent>> event_history;
-    QString current_request_id;
-    QString current_auth_attempt_id;
-    ZWebSocket client;
+    QList<QPair<Origin, ZBusEvent>> event_history;  // list of all events to and from zBus
+    QString current_request_id;                     // last requestId received from zBus event
+    QString current_auth_attempt_id;                // last authAttemptId received from zBus event
+    ZWebSocket client;                              // sender and receiver of zBus events
 
     FIELD *entry_fields[3] = {};
     FORM *entry_form = nullptr;
@@ -369,7 +388,8 @@ public:
         }
 
         // I think, if this is reached, the next selection is too large to fit on the terminal window
-        // TODO: address possibility of too-large events
+        // TODO: address possibility of too-large events by always printing at least one event
+        //       (display class can handle this)
         return next_selection;
     }
 
@@ -469,6 +489,11 @@ public:
         wrefresh(history_window);
     }
 
+    /* \brief Populates each of the event entry fields with the corresponding values from the given
+     *        event
+     *
+     * \param <event> The zBus event to be inserted into the entry form.
+     */
     void insert_event(ZBusEvent event)
     {
         set_field_buffer(entry_fields[0], 0, event.name().toUtf8());
@@ -476,6 +501,11 @@ public:
         set_field_buffer(entry_fields[2], 0, event.dataString().toUtf8());
     }
 
+    /* \brief Generates a visual list from the menu entries associated with the given menu value,
+     *        then writes it to the mock menu window.
+     *
+     * \param <menu> The menu to be displayed.
+     */
     void update_mock_menu(Menu menu)
     {
         QVector<MockMenuEntry> entries = mock_menu_entries[menu];
@@ -546,8 +576,8 @@ void ZBusCli::onDisconnected()
  *        to enable sending events from the text-based UI.
  *
  * \param <event> String containing the event sender and event type.
- * \param <event> String containing the requestId of the event.
  * \param <data> String containing the event data.
+ * \param <requestId> String containing the requestId of the event.
  *
  * \returns Number of bytes sent.
  */
@@ -563,7 +593,8 @@ qint64 ZBusCli::onEventSubmitted(const QString &event, const QString &data, cons
   return p->client.sendZBusEvent(zBusEvent);
 }
 
-/* \brief Stores the given event in the event_history list.
+/* \brief Stores the given event in the event_history list, and captures the event's `requestId` and
+ * `      `authAttemptId`.
  *
  *        This is connected to ZWebSocket's zBusEventReceived signal in order to save all received
  *        events, and keep track of the current requestId and authAttemptId expected from mock
@@ -593,8 +624,13 @@ void ZBusCli::onZBusEventReceived(const ZBusEvent &event)
 void ZBusCli::startEventLoop()
 {
   int current_size = 0; // size of event_history during previous cycle of event loop
-  int current_top = 0; // the index of the event in event_history at the top of the history window
-  State current { Mode::Command, Menu::Main, -1 };
+  int current_top = 0;  // the index of the event in event_history at the top of the history window
+  State current
+  {
+      Mode::Command,    // the mode with which to process input
+      Menu::Main,       // the current menu to display (only in command mode)
+      -1                // the current event selected (only in peruse mode)
+  };
 
   // capture input, process pending Qt events, then update the display
   while (true)
@@ -621,6 +657,7 @@ void ZBusCli::startEventLoop()
     // before updating the display, process pending Qt events
     QCoreApplication::processEvents();
 
+    // if the menu selection has changed, update the menu
     if (current.menu != next.menu)
     {
         p->update_mock_menu(next.menu);
@@ -694,13 +731,16 @@ void ZBusCli::startEventLoop()
 /* \brief Handles input received while the client is in Command mode.
  *
  * \param <input> Character code of keypress from keyboard.
+ * \param <current_menu> The menu displayed at the time of input.
+ * \param <selection> The index of the selected event at the time of input.
  *
- * \returns The Mode that further input should be processed with.
+ * \returns The context that subsequent input should be processed with.
  */
 State ZBusCli::handle_command_input(int input, Menu current_menu, int selection)
 {
     switch(input)
     {
+        // On any number, try to select a corresponding entry from the current menu
         case '0':
         case '1':
         case '2':
@@ -735,12 +775,15 @@ State ZBusCli::handle_command_input(int input, Menu current_menu, int selection)
                 return { Mode::Command, current_menu, selection };
             }
 
+        // On "s", switch to send mode and reset the mock menu window
         case 's':
             return { Mode::Send, Menu::Main, selection };
 
+        // On "p", switch to peruse mode and reset the mock menu window
         case 'p':
             return { Mode::Peruse, Menu::Main, selection };
 
+        // On all other input, do nothing
         default:
             return { Mode::Command, current_menu, selection };
     }
@@ -749,8 +792,10 @@ State ZBusCli::handle_command_input(int input, Menu current_menu, int selection)
 /* \brief Handles input received while the client is in Send mode.
  *
  * \param <input> Character code of keypress from keyboard.
+ * \param <current_menu> The menu displayed at the time of input.
+ * \param <selection> The index of the selected event at the time of input.
  *
- * \returns The Mode that further input should be processed with.
+ * \returns The context that subsequent input should be processed with.
  */
 State ZBusCli::handle_send_input(int input, Menu current_menu, int selection)
 {
@@ -828,8 +873,10 @@ State ZBusCli::handle_send_input(int input, Menu current_menu, int selection)
 /* \brief Handles input received while the client is in Peruse mode.
  *
  * \param <input> Character code of keypress from keyboard.
+ * \param <current_menu> The menu displayed at the time of input.
+ * \param <selection> The index of the selected event at the time of input.
  *
- * \returns The Mode that further input should be processed with.
+ * \returns The context that subsequent input should be processed with.
  */
 State ZBusCli::handle_peruse_input(int input, Menu current_menu, int selection)
 {
@@ -873,8 +920,12 @@ State ZBusCli::handle_peruse_input(int input, Menu current_menu, int selection)
                     selection = selection > 0 ? selection - 1 : latest_event;
                     return { Mode::Peruse, current_menu, selection };
             }
+
+            // on any other escape sequence, do nothing
+            // TODO: replace with default case, remove mixing of breaks and returns
             break;
     }
 
+    // on any other input, do nothing
     return { Mode::Peruse, current_menu, selection };
 }
