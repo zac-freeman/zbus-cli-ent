@@ -52,22 +52,22 @@ enum class Mock
 class ZBusEvent
 {
 public:
-  ZBusEvent(const QJsonObject &json = QJsonObject());
-  ZBusEvent(const QString &event,
+    ZBusEvent(const QJsonObject &json = QJsonObject());
+    ZBusEvent(const QString &event,
             const QJsonValue &data = QJsonValue(),
             const QString &requestId = QString());
-  ZBusEvent(enum Mock name,
+    ZBusEvent(enum Mock name,
             const QString &requestId = QString(),
             const QString &authAttemptId = QString());
 
-  QString toJson() const;
-  QString name() const;
-  QString dataString() const;
+    QString toJson() const;
+    QString name() const;
+    QString dataString() const;
 
-  QString sender;
-  QString type;
-  QJsonValue data;
-  QString requestId;
+    QString sender;
+    QString type;
+    QJsonValue data;
+    QString requestId;
 };
 
 #endif

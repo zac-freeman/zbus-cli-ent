@@ -9,7 +9,7 @@
 
 class ZWebSocketPrivate {
 public:
-  QQueue<ZBusEvent> eventQueue;
+    QQueue<ZBusEvent> eventQueue;
 };
 
 /* \brief Constructs ZWebSocket, and prepares to send any messages that were queued up before the
@@ -23,17 +23,17 @@ public:
 ZWebSocket::ZWebSocket(const QString &origin, QWebSocketProtocol::Version version, QObject *parent)
     : QWebSocket(origin, version, parent)
 {
-  p = new ZWebSocketPrivate();
+    p = new ZWebSocketPrivate();
 
-  connect(this, &ZWebSocket::connected, this, &ZWebSocket::processEventQueue);
-  connect(this, &ZWebSocket::textMessageReceived, this, &ZWebSocket::zBusEventReceived);
+    connect(this, &ZWebSocket::connected, this, &ZWebSocket::processEventQueue);
+    connect(this, &ZWebSocket::textMessageReceived, this, &ZWebSocket::zBusEventReceived);
 }
 
 /* \brief Cleans up objects created on the heap.
- */
+*/
 ZWebSocket::~ZWebSocket()
 {
-  delete p;
+    delete p;
 }
 
 /* \brief Sends events that were queued up while ZWebSocket was not connected to zBus and emits a
@@ -41,12 +41,12 @@ ZWebSocket::~ZWebSocket()
  */
 void ZWebSocket::processEventQueue()
 {
-  while (!p->eventQueue.isEmpty())
-  {
-      sendZBusEvent(p->eventQueue.dequeue());
-  }
+    while (!p->eventQueue.isEmpty())
+    {
+        sendZBusEvent(p->eventQueue.dequeue());
+    }
 
-  emit processedEventQueue();
+    emit processedEventQueue();
 }
 
 /* \brief If ZWebSocket is connected to zBus, sends the given event to zBus. Otherwise, the event is
@@ -58,15 +58,15 @@ void ZWebSocket::processEventQueue()
  */
 qint64 ZWebSocket::sendZBusEvent(const ZBusEvent &event)
 {
-  if (isValid())
-  {
-      return sendTextMessage(event.toJson());
-  }
-  else
-  {
-      p->eventQueue.enqueue(event);
-      return 0;
-  }
+    if (isValid())
+    {
+        return sendTextMessage(event.toJson());
+    }
+    else
+    {
+        p->eventQueue.enqueue(event);
+        return 0;
+    }
 }
 
 /* \brief Constructs, then sends, or queues, multiple events.
@@ -81,14 +81,14 @@ qint64 ZWebSocket::sendZBusEvent(const ZBusEvent &event)
  */
 qint64 ZWebSocket::sendZBusEvents(const QStringList &events)
 {
-  QList<ZBusEvent> zBusEvents;
-  QString event;
-  foreach(event, events)
-  {
-      zBusEvents.append(event);
-  }
+    QList<ZBusEvent> zBusEvents;
+    QString event;
+    foreach(event, events)
+    {
+        zBusEvents.append(event);
+    }
 
-  return sendZBusEvents(zBusEvents);
+    return sendZBusEvents(zBusEvents);
 }
 
 /* \brief Sends, or queues, multiple events.
@@ -99,12 +99,12 @@ qint64 ZWebSocket::sendZBusEvents(const QStringList &events)
  */
 qint64 ZWebSocket::sendZBusEvents(const QList<ZBusEvent> &events)
 {
-  qint64 bytesSent = 0;
-  ZBusEvent event;
-  foreach(event, events)
-  {
-      bytesSent += sendZBusEvent(event);
-  }
+    qint64 bytesSent = 0;
+    ZBusEvent event;
+    foreach(event, events)
+    {
+        bytesSent += sendZBusEvent(event);
+    }
 
-  return bytesSent;
+    return bytesSent;
 }

@@ -45,7 +45,7 @@ static const QMap<Mode, QString> help_text
 {
     { Mode::Command, "Ctrl+C) exit program, s) begin send mode, p) begin peruse mode" },
     { Mode::Send, "Ctrl+C) exit program, Esc) begin command mode, Tab) switch field, "
-                   "Enter) send event" },
+                  "Enter) send event" },
     { Mode::Peruse, "Ctrl+C) exit program, Esc) begin command mode" }
 };
 
@@ -192,7 +192,7 @@ public:
     WINDOW_PROPERTIES history;
 
     /* \brief Initializes ncurses and constructs the UI to use all available space in the terminal.
-     */
+    */
     ZBusCliPrivate()
     {
         initscr();                // starts curses mode and instantiates stdscr
@@ -529,21 +529,21 @@ public:
  */
 ZBusCli::ZBusCli(QObject *parent) : QObject(parent)
 {
-  p = new ZBusCliPrivate();
+    p = new ZBusCliPrivate();
 
-  connect(&p->client, &ZWebSocket::disconnected,
-          this, &ZBusCli::onDisconnected);
-  connect(this, &ZBusCli::eventSubmitted,
-          this, &ZBusCli::onEventSubmitted);
-  connect(&p->client, &ZWebSocket::zBusEventReceived,
-          this, &ZBusCli::onZBusEventReceived);
+    connect(&p->client, &ZWebSocket::disconnected,
+            this, &ZBusCli::onDisconnected);
+    connect(this, &ZBusCli::eventSubmitted,
+            this, &ZBusCli::onEventSubmitted);
+    connect(&p->client, &ZWebSocket::zBusEventReceived,
+            this, &ZBusCli::onZBusEventReceived);
 }
 
 /* \brief Cleans up the PIMPL object.
- */
+*/
 ZBusCli::~ZBusCli()
 {
-  delete p;
+    delete p;
 }
 
 /* \brief Connects the zBus client to the zBus server at the given URL, and starts the ncurses event
@@ -553,11 +553,11 @@ ZBusCli::~ZBusCli()
  */
 void ZBusCli::exec(const QUrl &zBusUrl)
 {
-  // connect client to zBus server
-  p->client.open(zBusUrl);
+    // connect client to zBus server
+    p->client.open(zBusUrl);
 
-  // wait for input and update display
-  startEventLoop();
+    // wait for input and update display
+    startEventLoop();
 }
 
 /* \brief Attempts to connect to zBus after a delay. This is connected to ZWebSocket's disconnected
@@ -565,8 +565,8 @@ void ZBusCli::exec(const QUrl &zBusUrl)
  */
 void ZBusCli::onDisconnected()
 {
-  QUrl zBusUrl = p->client.requestUrl();
-  QTimer::singleShot(RETRY_DELAY_MS, [this, zBusUrl] {p->client.open(zBusUrl);});
+    QUrl zBusUrl = p->client.requestUrl();
+    QTimer::singleShot(RETRY_DELAY_MS, [this, zBusUrl] {p->client.open(zBusUrl);});
 }
 
 /* \brief Constructs a ZBusEvent from the given event string and data string, sends it to zBus, and
@@ -583,14 +583,14 @@ void ZBusCli::onDisconnected()
  */
 qint64 ZBusCli::onEventSubmitted(const QString &event, const QString &data, const QString &requestId)
 {
-  // store data as appropriate type of JSON value;
-  // if the data is not an object or array, it is assumed that it is a string
-  QJsonDocument dataDoc = QJsonDocument::fromJson(data.trimmed().toUtf8());
-  QJsonValue json = dataDoc.isNull() ? data.trimmed() : QJsonValue::fromVariant(dataDoc.toVariant());
+    // store data as appropriate type of JSON value;
+    // if the data is not an object or array, it is assumed that it is a string
+    QJsonDocument dataDoc = QJsonDocument::fromJson(data.trimmed().toUtf8());
+    QJsonValue json = dataDoc.isNull() ? data.trimmed() : QJsonValue::fromVariant(dataDoc.toVariant());
 
-  ZBusEvent zBusEvent(event.trimmed(), json, requestId.trimmed());
-  p->event_history.append({Origin::Sent, zBusEvent});
-  return p->client.sendZBusEvent(zBusEvent);
+    ZBusEvent zBusEvent(event.trimmed(), json, requestId.trimmed());
+    p->event_history.append({Origin::Sent, zBusEvent});
+    return p->client.sendZBusEvent(zBusEvent);
 }
 
 /* \brief Stores the given event in the event_history list, and captures the event's `requestId` and
@@ -604,18 +604,18 @@ qint64 ZBusCli::onEventSubmitted(const QString &event, const QString &data, cons
  */
 void ZBusCli::onZBusEventReceived(const ZBusEvent &event)
 {
-  p->event_history.append({Origin::Received, event});
+    p->event_history.append({Origin::Received, event});
 
-  // if the received event contains a requestId,
-  // update the stored requestId for mock events
-  p->current_request_id = event.requestId.isEmpty() ? p->current_request_id
-                                                  : event.requestId;
+    // if the received event contains a requestId,
+    // update the stored requestId for mock events
+    p->current_request_id = event.requestId.isEmpty() ? p->current_request_id
+                                                      : event.requestId;
 
-  // if the received event contains an authAttemptId,
-  // update the stored authAttemptId for mock events
-  const QString auth_attempt_id = event.data.toObject().value("authAttemptId").toString();
-  p->current_auth_attempt_id = auth_attempt_id.isEmpty() ? p->current_auth_attempt_id
-                                                       : auth_attempt_id;
+    // if the received event contains an authAttemptId,
+    // update the stored authAttemptId for mock events
+    const QString auth_attempt_id = event.data.toObject().value("authAttemptId").toString();
+    p->current_auth_attempt_id = auth_attempt_id.isEmpty() ? p->current_auth_attempt_id
+                                                           : auth_attempt_id;
 }
 
 /* \brief Starts an infinite loop that waits for input, processes pending Qt events, and updates the
@@ -623,109 +623,113 @@ void ZBusCli::onZBusEventReceived(const ZBusEvent &event)
  */
 void ZBusCli::startEventLoop()
 {
-  int current_size = 0; // size of event_history during previous cycle of event loop
-  int current_top = 0;  // the index of the event in event_history at the top of the history window
-  State current
-  {
-      Mode::Command,    // the mode with which to process input
-      Menu::Main,       // the current menu to display (only in command mode)
-      -1                // the current event selected (only in peruse mode)
-  };
-
-  // capture input, process pending Qt events, then update the display
-  while (true)
-  {
-    int input = wgetch(p->entry_window);
-
-    // process input with current state, and capture next state for next input
-    State next { current.mode, current.menu, current.selection };
-    switch(current.mode)
+    int current_size = 0; // size of event_history during previous cycle of event loop
+    int current_top = 0;  // the index of the event in event_history at the top of the history window
+    State current
     {
-        case Mode::Command:
-            next = handle_command_input(input, current.menu, current.selection);
-            break;
+        Mode::Command,    // the mode with which to process input
+        Menu::Main,       // the current menu to display (only in command mode)
+        -1                // the current event selected (only in peruse mode)
+    };
 
-        case Mode::Send:
-            next = handle_send_input(input, current.menu, current.selection);
-            break;
-
-        case Mode::Peruse:
-            next = handle_peruse_input(input, current.menu, current.selection);
-            break;
-    }
-
-    // before updating the display, process pending Qt events
-    QCoreApplication::processEvents();
-
-    // if the menu selection has changed, update the menu
-    if (current.menu != next.menu)
+    // capture input, process pending Qt events, then update the display
+    while (true)
     {
-        p->update_mock_menu(next.menu);
+        int input = wgetch(p->entry_window);
+
+        // process input with current state, and capture next state for next input
+        State next { current.mode, current.menu, current.selection };
+        switch(current.mode)
+        {
+            case Mode::Command:
+                next = handle_command_input(input, current.menu, current.selection);
+                break;
+
+            case Mode::Send:
+                next = handle_send_input(input, current.menu, current.selection);
+                break;
+
+            case Mode::Peruse:
+                next = handle_peruse_input(input, current.menu, current.selection);
+                break;
+        }
+
+        // before updating the display, process pending Qt events
+        QCoreApplication::processEvents();
+
+        // if the menu selection has changed, update the menu
+        if (current.menu != next.menu)
+        {
+            p->update_mock_menu(next.menu);
+        }
+
+        // if the mode has changed, update the help text and resize the history to fill the available
+        // space
+        if (current.mode != next.mode)
+        {
+            p->update_help_text(next.mode);
+            p->resize_history_window(next.mode);
+        }
+
+        // update the connection status message
+        if (p->client.isValid())
+        {
+            wmove(p->status_window, 0, 0);
+            wclear(p->status_window);
+            wattron(p->status_window, COLOR_PAIR(GREEN_TEXT) | A_BOLD);
+            wprintw(p->status_window, "status: connected to zBus");
+            wattroff(p->status_window, COLOR_PAIR(GREEN_TEXT) | A_BOLD);
+            wrefresh(p->status_window);
+        }
+        else
+        {
+            wmove(p->status_window, 0, 0);
+            wclrtoeol(p->status_window);
+            wattron(p->status_window, COLOR_PAIR(RED_TEXT) | A_BOLD);
+            wprintw(p->status_window, "status: disconnected from zBus");
+            wattroff(p->status_window, COLOR_PAIR(RED_TEXT) | A_BOLD);
+            wrefresh(p->status_window);
+        }
+
+        // if there is a connection error, display it
+        if (p->client.error() != QAbstractSocket::UnknownSocketError)
+        {
+            wmove(p->status_window, 1, 0);
+            wclrtoeol(p->status_window);
+            wattron(p->status_window, COLOR_PAIR(RED_TEXT) | A_BOLD);
+            wprintw(p->status_window, "error: ");
+            wprintw(p->status_window, p->client.errorString().toUtf8());
+            wattroff(p->status_window, COLOR_PAIR(RED_TEXT) | A_BOLD);
+            wrefresh(p->status_window);
+        }
+
+        // if any new events have been received, or the event selection has changed,
+        // update the event history
+        int next_size = p->event_history.size();
+        if (next.selection != current.selection || next_size > current_size)
+        {
+            int next_top = p->find_top_for_selection(current_top, next.selection);
+            p->update_history_window(next_top, next.selection);
+
+            current_size = next_size;
+            current_top = next_top;
+        }
+
+        // if entry fields are visible, return cursor to last position in current field
+        // otherwise, hide the cursor
+        if (next.mode == Mode::Send)
+        {
+            curs_set(1);
+            pos_form_cursor(p->entry_form);
+        }
+        else
+        {
+            curs_set(0);
+        }
+
+        // update state for processing next input
+        current = next;
     }
-
-    // if the mode has changed, update the help text and resize the history to fill the available
-    // space
-    if (current.mode != next.mode)
-    {
-        p->update_help_text(next.mode);
-        p->resize_history_window(next.mode);
-    }
-
-    // update the connection status message
-    if (p->client.isValid())
-    {
-        wmove(p->status_window, 0, 0);
-        wclear(p->status_window);
-        wattron(p->status_window, COLOR_PAIR(GREEN_TEXT) | A_BOLD);
-        wprintw(p->status_window, "status: connected to zBus");
-        wattroff(p->status_window, COLOR_PAIR(GREEN_TEXT) | A_BOLD);
-        wrefresh(p->status_window);
-    } else {
-        wmove(p->status_window, 0, 0);
-        wclrtoeol(p->status_window);
-        wattron(p->status_window, COLOR_PAIR(RED_TEXT) | A_BOLD);
-        wprintw(p->status_window, "status: disconnected from zBus");
-        wattroff(p->status_window, COLOR_PAIR(RED_TEXT) | A_BOLD);
-        wrefresh(p->status_window);
-    }
-
-    // if there is a connection error, display it
-    if (p->client.error() != QAbstractSocket::UnknownSocketError)
-    {
-        wmove(p->status_window, 1, 0);
-        wclrtoeol(p->status_window);
-        wattron(p->status_window, COLOR_PAIR(RED_TEXT) | A_BOLD);
-        wprintw(p->status_window, "error: ");
-        wprintw(p->status_window, p->client.errorString().toUtf8());
-        wattroff(p->status_window, COLOR_PAIR(RED_TEXT) | A_BOLD);
-        wrefresh(p->status_window);
-    }
-
-    // if any new events have been received, or the event selection has changed,
-    // update the event history
-    int next_size = p->event_history.size();
-    if (next.selection != current.selection || next_size > current_size)
-    {
-        int next_top = p->find_top_for_selection(current_top, next.selection);
-        p->update_history_window(next_top, next.selection);
-
-        current_size = next_size;
-        current_top = next_top;
-    }
-
-    // if entry fields are visible, return cursor to last position in current field
-    // otherwise, hide the cursor
-    if (next.mode == Mode::Send)
-    {
-        curs_set(1);
-        pos_form_cursor(p->entry_form);
-    } else {
-        curs_set(0);
-    }
-
-    // update state for processing next input
-    current = next;
-  }
 }
 
 /* \brief Handles input received while the client is in Command mode.
@@ -765,8 +769,8 @@ State ZBusCli::handle_command_input(int input, Menu current_menu, int selection)
                 if (entry.mock != Mock::None)
                 {
                     p->insert_event({entry.mock,
-                                     p->current_request_id,
-                                     p->current_auth_attempt_id});
+                            p->current_request_id,
+                            p->current_auth_attempt_id});
                     return { Mode::Send, Menu::Main, selection };
                 }
 
@@ -775,15 +779,15 @@ State ZBusCli::handle_command_input(int input, Menu current_menu, int selection)
                 return { Mode::Command, current_menu, selection };
             }
 
-        // On "s", switch to send mode and reset the mock menu window
+            // On "s", switch to send mode and reset the mock menu window
         case 's':
             return { Mode::Send, Menu::Main, selection };
 
-        // On "p", switch to peruse mode and reset the mock menu window
+            // On "p", switch to peruse mode and reset the mock menu window
         case 'p':
             return { Mode::Peruse, Menu::Main, selection };
 
-        // On all other input, do nothing
+            // On all other input, do nothing
         default:
             return { Mode::Command, current_menu, selection };
     }
@@ -805,30 +809,30 @@ State ZBusCli::handle_send_input(int input, Menu current_menu, int selection)
         case ERR:
             break;
 
-        // on Tab, move the cursor to the next field
+            // on Tab, move the cursor to the next field
         case '\t':
         case KEY_STAB:
             form_driver(p->entry_form, REQ_NEXT_FIELD);
             form_driver(p->entry_form, REQ_END_LINE);
             break;
 
-        // On Enter, send the contents of the fields to zBus
+            // On Enter, send the contents of the fields to zBus
         case '\r':
         case '\n':
         case KEY_ENTER:
             form_driver(p->entry_form, REQ_VALIDATION);
             emit eventSubmitted(field_buffer(p->entry_fields[0], 0),
-                                field_buffer(p->entry_fields[2], 0),
-                                field_buffer(p->entry_fields[1], 0));
+                    field_buffer(p->entry_fields[2], 0),
+                    field_buffer(p->entry_fields[1], 0));
             break;
 
-        // on Backspace, backspace
+            // on Backspace, backspace
         case 127:
         case KEY_BACKSPACE:
             form_driver(p->entry_form, REQ_DEL_PREV);
             break;
 
-        // on Escape, determine whether or not this is the beginning of an "Escape Sequence"
+            // on Escape, determine whether or not this is the beginning of an "Escape Sequence"
         case '\033':
             input = wgetch(p->entry_window);
 
@@ -847,22 +851,22 @@ State ZBusCli::handle_send_input(int input, Menu current_menu, int selection)
                 case 'A': 
                     form_driver(p->entry_form, REQ_UP_CHAR);
                     break;
-                // Down
+                    // Down
                 case 'B': 
                     form_driver(p->entry_form, REQ_DOWN_CHAR);
                     break;
-                // Right
+                    // Right
                 case 'C': 
                     form_driver(p->entry_form, REQ_RIGHT_CHAR);
                     break;
-                // Left
+                    // Left
                 case 'D': 
                     form_driver(p->entry_form, REQ_LEFT_CHAR);
                     break;
             }
             break;
 
-        // provide all other input as characters to the current field
+            // provide all other input as characters to the current field
         default:
             form_driver(p->entry_form, input);
     }
@@ -914,7 +918,7 @@ State ZBusCli::handle_peruse_input(int input, Menu current_menu, int selection)
                     }
 
                     return { Mode::Peruse, current_menu, selection + 1};
-                // Down
+                    // Down
                 case 'B':
                     // wrap around to latest event if first event is selected
                     selection = selection > 0 ? selection - 1 : latest_event;

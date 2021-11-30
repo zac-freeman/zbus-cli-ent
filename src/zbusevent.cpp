@@ -48,11 +48,11 @@ static const QMap<Mock, ZBusEvent> mockEvent
  */
 ZBusEvent::ZBusEvent(const QJsonObject &json)
 {
-  QStringList senderAndType = json.value("event").toString().split(".");
-  this->sender = senderAndType.value(0);
-  this->type = senderAndType.value(1);
-  this->data = json.value("data");
-  this->requestId = json.value("requestId").toString();
+    QStringList senderAndType = json.value("event").toString().split(".");
+    this->sender = senderAndType.value(0);
+    this->type = senderAndType.value(1);
+    this->data = json.value("data");
+    this->requestId = json.value("requestId").toString();
 }
 
 /* \brief Constructs a ZBusEvent from the given event string and data string.
@@ -66,11 +66,11 @@ ZBusEvent::ZBusEvent(const QString &event,
                      const QJsonValue &data,
                      const QString &requestId)
 {
-  QStringList senderAndType = event.split(".");
-  this->sender = senderAndType.value(0);
-  this->type = senderAndType.value(1);
-  this->data = data;
-  this->requestId = requestId;
+    QStringList senderAndType = event.split(".");
+    this->sender = senderAndType.value(0);
+    this->type = senderAndType.value(1);
+    this->data = data;
+    this->requestId = requestId;
 }
 
 /* \brief Constructs a mock ZBusEvent for a given Mock value, from the mock event map. Optionally
@@ -104,11 +104,11 @@ ZBusEvent::ZBusEvent(enum Mock name,
  */
 QString ZBusEvent::toJson() const
 {
-  QJsonObject json{{"event", sender + (type.isEmpty() ? "" : ".") + type},
-                   {"data", data},
-                   {"requestId", requestId}};
+    QJsonObject json{{"event", name()},
+                     {"data", data},
+                     {"requestId", requestId}};
 
-  return QJsonDocument(json).toJson(QJsonDocument::Compact);
+    return QJsonDocument(json).toJson(QJsonDocument::Compact);
 }
 
 /* \brief Assembles the event name from the sender and type.
@@ -130,15 +130,15 @@ QString ZBusEvent::name() const
  */
 QString ZBusEvent::dataString() const
 {
-  if (data.isObject())
-  {
-    return QJsonDocument(data.toObject()).toJson(QJsonDocument::Compact);
-  }
+    if (data.isObject())
+    {
+        return QJsonDocument(data.toObject()).toJson(QJsonDocument::Compact);
+    }
 
-  if (data.isArray())
-  {
-    return QJsonDocument(data.toArray()).toJson(QJsonDocument::Compact);
-  }
+    if (data.isArray())
+    {
+        return QJsonDocument(data.toArray()).toJson(QJsonDocument::Compact);
+    }
 
-   return data.toString();
+    return data.toString();
 }

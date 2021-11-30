@@ -29,29 +29,29 @@ enum class Mode { Command, Send, Peruse };
  */
 class ZBusCli : public QObject
 {
-  Q_OBJECT
-  Q_DISABLE_COPY(ZBusCli)
+    Q_OBJECT
+    Q_DISABLE_COPY(ZBusCli)
 
 public:
-  ZBusCli(QObject *parent = nullptr);
-  ~ZBusCli();
+    ZBusCli(QObject *parent = nullptr);
+    ~ZBusCli();
 
-  void exec(const QUrl &zBusUrl);
-  void startEventLoop();
-  State handle_command_input(int input, enum Menu current_menu, int selection);
-  State handle_peruse_input(int input, enum Menu current_menu, int selection);
-  State handle_send_input(int input, enum Menu current_menu, int selection);
+    void exec(const QUrl &zBusUrl);
+    void startEventLoop();
+    State handle_command_input(int input, enum Menu current_menu, int selection);
+    State handle_peruse_input(int input, enum Menu current_menu, int selection);
+    State handle_send_input(int input, enum Menu current_menu, int selection);
 
 signals:
-  void eventSubmitted(const QString &event, const QString &data, const QString &requestId);
+    void eventSubmitted(const QString &event, const QString &data, const QString &requestId);
 
 private slots:
-  void onDisconnected();
-  qint64 onEventSubmitted(const QString &event, const QString &data, const QString &requestId);
-  void onZBusEventReceived(const ZBusEvent &event);
+    void onDisconnected();
+    qint64 onEventSubmitted(const QString &event, const QString &data, const QString &requestId);
+    void onZBusEventReceived(const ZBusEvent &event);
 
 private:
-  ZBusCliPrivate *p;
+    ZBusCliPrivate *p;
 };
 
 #endif
