@@ -5,6 +5,9 @@
 #include <QJsonObject>
 #include <QString>
 
+/* Mock event types. For each value, there is a corresponding event that mocks some event from a
+ * hardware device.
+ */
 enum class Mock
 {
     // nuffin

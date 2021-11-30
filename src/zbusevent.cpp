@@ -7,6 +7,9 @@
 #include <QStringList>
 #include <QVariant>
 
+/* Mocked hardware events, corresponding to specific hardware events/behaviors named in the `Mock`
+ * enum.
+ */
 static const QMap<Mock, ZBusEvent> mockEvent
 {
     // nuffin
@@ -41,7 +44,7 @@ static const QMap<Mock, ZBusEvent> mockEvent
 /* \brief Constructs a ZBusEvent from a json object. If a field can not be extracted from
  *        the given object for any reason (e.g. invalid json, missing field), it will be left blank.
  *
- * \param <json> JSON-formatted string.
+ * \param <json> JSON object expected to contain `event`, `data`, and `requestId`.
  */
 ZBusEvent::ZBusEvent(const QJsonObject &json)
 {
@@ -70,6 +73,14 @@ ZBusEvent::ZBusEvent(const QString &event,
   this->requestId = requestId;
 }
 
+/* \brief Constructs a mock ZBusEvent for a given Mock value, from the mock event map. Optionally
+ *        adds the provided `requestId` and `authAttemptId` to the mocked event to associate said
+ *        event with a real transaction.
+ *
+ * \param <Mock> Event type to determine the type, sender, and data.
+ * \param <requestId> String ID of the pinpad request this event corresponds to.
+ * \param <authAttemptId> String ID of the pinpad payment authorization this event corresponds to.
+ */
 ZBusEvent::ZBusEvent(enum Mock name,
                      const QString &requestId,
                      const QString &authAttemptId)
@@ -100,11 +111,23 @@ QString ZBusEvent::toJson() const
   return QJsonDocument(json).toJson(QJsonDocument::Compact);
 }
 
+/* \brief Assembles the event name from the sender and type.
+ *
+ * \returns The event name of the ZBusEvent.
+ */
 QString ZBusEvent::name() const
 {
     return sender + "." + type;
 }
 
+/* \brief Creates a JSON-formatted string from the event data.
+ *
+ *        Since the event data can be any valid JSON, this function must check the type of the event
+ *        data before attempting to convert it to a string. Simply calling `data.toString()` would
+ *        result in an empty string if `data` is an object or array.
+ *
+ * \returns The event name of the ZBusEvent.
+ */
 QString ZBusEvent::dataString() const
 {
   if (data.isObject())

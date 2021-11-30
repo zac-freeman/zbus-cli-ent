@@ -4,6 +4,8 @@
 #include <QJsonObject>
 #include <QString>
 
+// Mock event data used to generate mocked events.
+
 static const QJsonObject MOCK_CARD_INFO
 {
     {
