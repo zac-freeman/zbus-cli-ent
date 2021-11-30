@@ -3,6 +3,7 @@
 #include "zbusevent.h"
 
 #include <QDebug>
+#include <QJsonDocument>
 #include <QList>
 #include <QQueue>
 #include <QString>
@@ -26,7 +27,11 @@ ZWebSocket::ZWebSocket(const QString &origin, QWebSocketProtocol::Version versio
     p = new ZWebSocketPrivate();
 
     connect(this, &ZWebSocket::connected, this, &ZWebSocket::processEventQueue);
-    connect(this, &ZWebSocket::textMessageReceived, this, &ZWebSocket::zBusEventReceived);
+    connect(this, &ZWebSocket::textMessageReceived,
+            [this] (const QString &text)
+            {
+                emit zBusEventReceived(QJsonDocument::fromJson(text.toUtf8()).object());
+            });
 }
 
 /* \brief Cleans up objects created on the heap.
