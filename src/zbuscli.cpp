@@ -164,7 +164,6 @@ struct WINDOW_PROPERTIES
 
 /* The private implementation for `ZBusCli`. Contains logic for handling inbound/outbound zBus
  * events, user input, and the UI.
- *
  */
 class ZBusCliPrivate
 {
@@ -457,10 +456,7 @@ public:
         wrefresh(help_window);
     }
 
-    /* \brief Adjusts the height of the event history window, depending on the given mode. If the given
-     *        mode is not Send, the history window height is increased to cover the event entry fields.
-     *        If the mode is Send, the history window height is decreased to reveal the event entry
-     *        fields.
+    /* \brief Adjusts the height of the event history window, depending on the given mode.
      *
      * \param <mode> Mode for which the history window should be resized.
      */
@@ -717,6 +713,7 @@ void ZBusCli::startEventLoop()
 
         // if entry fields are visible, return cursor to last position in current field
         // otherwise, hide the cursor
+        // TODO: put the cursor somewhere in other modes?
         if (next.mode == Mode::Send)
         {
             curs_set(1);
@@ -779,15 +776,15 @@ State ZBusCli::handle_command_input(int input, Menu current_menu, int selection)
                 return { Mode::Command, current_menu, selection };
             }
 
-            // On "s", switch to send mode and reset the mock menu window
+        // On "s", switch to send mode and reset the mock menu window
         case 's':
             return { Mode::Send, Menu::Main, selection };
 
-            // On "p", switch to peruse mode and reset the mock menu window
+        // On "p", switch to peruse mode and reset the mock menu window
         case 'p':
             return { Mode::Peruse, Menu::Main, selection };
 
-            // On all other input, do nothing
+        // On all other input, do nothing
         default:
             return { Mode::Command, current_menu, selection };
     }
@@ -809,14 +806,14 @@ State ZBusCli::handle_send_input(int input, Menu current_menu, int selection)
         case ERR:
             break;
 
-            // on Tab, move the cursor to the next field
+        // on Tab, move the cursor to the next field
         case '\t':
         case KEY_STAB:
             form_driver(p->entry_form, REQ_NEXT_FIELD);
             form_driver(p->entry_form, REQ_END_LINE);
             break;
 
-            // On Enter, send the contents of the fields to zBus
+        // On Enter, send the contents of the fields to zBus
         case '\r':
         case '\n':
         case KEY_ENTER:
@@ -826,7 +823,7 @@ State ZBusCli::handle_send_input(int input, Menu current_menu, int selection)
                     field_buffer(p->entry_fields[1], 0));
             break;
 
-            // on Backspace, backspace
+        // on Backspace, backspace
         case 127:
         case KEY_BACKSPACE:
             form_driver(p->entry_form, REQ_DEL_PREV);
@@ -851,22 +848,22 @@ State ZBusCli::handle_send_input(int input, Menu current_menu, int selection)
                 case 'A': 
                     form_driver(p->entry_form, REQ_UP_CHAR);
                     break;
-                    // Down
+                // Down
                 case 'B': 
                     form_driver(p->entry_form, REQ_DOWN_CHAR);
                     break;
-                    // Right
+                // Right
                 case 'C': 
                     form_driver(p->entry_form, REQ_RIGHT_CHAR);
                     break;
-                    // Left
+                // Left
                 case 'D': 
                     form_driver(p->entry_form, REQ_LEFT_CHAR);
                     break;
             }
             break;
 
-            // provide all other input as characters to the current field
+        // provide all other input as characters to the current field
         default:
             form_driver(p->entry_form, input);
     }
@@ -918,7 +915,7 @@ State ZBusCli::handle_peruse_input(int input, Menu current_menu, int selection)
                     }
 
                     return { Mode::Peruse, current_menu, selection + 1};
-                    // Down
+                // Down
                 case 'B':
                     // wrap around to latest event if first event is selected
                     selection = selection > 0 ? selection - 1 : latest_event;
