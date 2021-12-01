@@ -72,7 +72,29 @@ Test the connection to zBus (note the exclusion of the `ws://` protocol from the
 ./zbus-curl-test.sh 10.0.0.42:8180
 ```
 
+### Mocking the Pinpad
+
+To convince a local instance of [POS][] that it is connected to a pinpad, open an SSH tunnel for
+[zBus][] and [Gemini][] to a physical store box with pinpads connected. In [POS][], select a register
+number that corresponds to a physical register (or thin client) that has a pinpad. To clear the
+"No Pinpad" error message in [POS][], send a `pinpad.displayItemSuccess` message from
+`zbus-cli-ent`.
+
+At this point, the "Credit/Debit" button should be enabled. After beginning the payment
+authorization flow from [POS][], use the mock menu in `zbus-cli-ent` to send the following events in
+order: 
+    1. `pinpad.cardInserted`
+    2. `pinpad.cardRead`
+    3. `pinpad.paymentAccepted`
+    4. `pinpad.cardRemoved`
+    5. `pinpad.finishTransaction`
+
+`zbus-cli-ent` will handle populating each event with the appropriate data, `requestId`, and
+`authAttemptId`.
+
 [Docker]: https://docs.docker.com/get-docker/
+[Gemini]: https://gitlab.autozone.com/store-operations/azstore/-/tree/master/gemini
+[POS]: https://gitlab.autozone.com/store-operations/pos-rearch/azstore/-/tree/master/web/packages/pos-webui
 [ncurses]: https://tldp.org/HOWTO/NCURSES-Programming-HOWTO/intro.html
 [Qt]: https://www.qt.io/download
 [zBus]: https://gitlab.autozone.com/store-operations/azstore/-/tree/master/zbus
