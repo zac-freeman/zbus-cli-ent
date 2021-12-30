@@ -43,11 +43,11 @@ public:
     State handle_send_input(int input, enum Menu current_menu, int selection);
 
 signals:
-    void eventSubmitted(const QString &event, const QString &data, const QString &requestId);
+    void eventSubmitted(const ZBusEvent &event);
 
 private slots:
     void onDisconnected();
-    qint64 onEventSubmitted(const QString &event, const QString &data, const QString &requestId);
+    qint64 onEventSubmitted(const ZBusEvent &event);
     void onZBusEventReceived(const ZBusEvent &event);
 
 private:

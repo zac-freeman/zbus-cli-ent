@@ -43,7 +43,8 @@ static const QMap<Origin, QString> origin_sign
 // Maps each mode to the corresponding help text to be displayed.
 static const QMap<Mode, QString> help_text
 {
-    { Mode::Command, "Ctrl+C) exit program, s) begin send mode, p) begin peruse mode" },
+    { Mode::Command, "Ctrl+C) exit program, s) begin send mode, p) begin peruse mode, "
+                     "m) toggle pinpad simulator" },
     { Mode::Send, "Ctrl+C) exit program, Esc) begin command mode, Tab) switch field, "
                   "Enter) send event" },
     { Mode::Peruse, "Ctrl+C) exit program, Esc) begin command mode" }
@@ -68,6 +69,14 @@ struct MockMenuEntry
     MockMenuEntry(const QString &text, enum Menu menu) : text(text), menu(menu), mock(Mock::None) {}
 
     MockMenuEntry(const QString &text, enum Mock mock) : text(text), menu(Menu::None), mock(mock) {}
+};
+
+static const QMap<QString, QVector<Mock>> pinpad_simulator_responses
+{
+    { "pos.connected", { Mock::PinpadDisplayItemSuccess } },
+    { "pinpad.preparePaymentRequest", { Mock::PinpadCardInserted, Mock::PinpadCardInfo } },
+    { "pinpad.authorizePaymentRequest", { Mock::PinpadPaymentAccepted, Mock::PinpadCardRemoved } },
+    { "pinpad.finishPaymentRequest", { Mock::PinpadFinishPaymentRequest } }
 };
 
 /* Maps each `Menu` value to a list of `MockMenuEntry`s. This map represents a tree (excluding the
@@ -171,6 +180,7 @@ public:
     QList<QPair<Origin, ZBusEvent>> event_history;  // list of all events to and from zBus
     QString current_request_id;                     // last requestId received from zBus event
     QString current_auth_attempt_id;                // last authAttemptId received from zBus event
+    bool pinpad_simulator_enabled;
     ZWebSocket client;                              // sender and receiver of zBus events
 
     FIELD *entry_fields[3] = {};
@@ -577,20 +587,14 @@ void ZBusCli::onDisconnected()
  *
  * \returns Number of bytes sent.
  */
-qint64 ZBusCli::onEventSubmitted(const QString &event, const QString &data, const QString &requestId)
+qint64 ZBusCli::onEventSubmitted(const ZBusEvent &event)
 {
-    // store data as appropriate type of JSON value;
-    // if the data is not an object or array, it is assumed that it is a string
-    QJsonDocument dataDoc = QJsonDocument::fromJson(data.trimmed().toUtf8());
-    QJsonValue json = dataDoc.isNull() ? data.trimmed() : QJsonValue::fromVariant(dataDoc.toVariant());
-
-    ZBusEvent zBusEvent(event.trimmed(), json, requestId.trimmed());
-    p->event_history.append({Origin::Sent, zBusEvent});
-    return p->client.sendZBusEvent(zBusEvent);
+    p->event_history.append({ Origin::Sent, event });
+    return p->client.sendZBusEvent(event);
 }
 
 /* \brief Stores the given event in the event_history list, and captures the event's `requestId` and
- * `      `authAttemptId`.
+ *        `authAttemptId`.
  *
  *        This is connected to ZWebSocket's zBusEventReceived signal in order to save all received
  *        events, and keep track of the current requestId and authAttemptId expected from mock
@@ -612,6 +616,24 @@ void ZBusCli::onZBusEventReceived(const ZBusEvent &event)
     const QString auth_attempt_id = event.data.toObject().value("authAttemptId").toString();
     p->current_auth_attempt_id = auth_attempt_id.isEmpty() ? p->current_auth_attempt_id
                                                            : auth_attempt_id;
+
+    // if the pinpad simulator is enabled, attempt to respond to the event
+    if (p->pinpad_simulator_enabled)
+    {
+        QVector<Mock> responses = pinpad_simulator_responses.value(event.name());
+        foreach (Mock response, responses)
+        {
+            // POS needs about 5 seconds before it is able to receive responses to
+            // pinpad.preparePaymentRequest
+            int timeout = (response == Mock::PinpadCardInserted
+                        || response == Mock::PinpadCardInfo) ? 5000 : 100;
+            QTimer::singleShot(
+                    timeout,
+                    [response, this] { onEventSubmitted({ response,
+                                                        p->current_request_id,
+                                                        p->current_auth_attempt_id });});
+        }
+    }
 }
 
 /* \brief Starts an infinite loop that waits for input, processes pending Qt events, and updates the
@@ -733,7 +755,7 @@ void ZBusCli::startEventLoop()
  *
  * \param <input> Character code of keypress from keyboard.
  * \param <current_menu> The menu displayed at the time of input.
- * \param <selection> The index of the selected event at the time of input.
+ * \param <selection> The index of the selected menu entry at the time of input.
  *
  * \returns The context that subsequent input should be processed with.
  */
@@ -765,9 +787,9 @@ State ZBusCli::handle_command_input(int input, Menu current_menu, int selection)
                 // if the selection refers to a mock event, insert the mock event
                 if (entry.mock != Mock::None)
                 {
-                    p->insert_event({entry.mock,
+                    p->insert_event({ entry.mock,
                             p->current_request_id,
-                            p->current_auth_attempt_id});
+                            p->current_auth_attempt_id });
                     return { Mode::Send, Menu::Main, selection };
                 }
 
@@ -783,6 +805,11 @@ State ZBusCli::handle_command_input(int input, Menu current_menu, int selection)
         // On "p", switch to peruse mode and reset the mock menu window
         case 'p':
             return { Mode::Peruse, Menu::Main, selection };
+
+        // On "m", toggle the pinpad simulator:
+        case 'm':
+            p->pinpad_simulator_enabled = !p->pinpad_simulator_enabled;
+            return { Mode::Command, current_menu, selection };
 
         // On all other input, do nothing
         default:
@@ -818,9 +845,9 @@ State ZBusCli::handle_send_input(int input, Menu current_menu, int selection)
         case '\n':
         case KEY_ENTER:
             form_driver(p->entry_form, REQ_VALIDATION);
-            emit eventSubmitted(field_buffer(p->entry_fields[0], 0),
+            emit eventSubmitted({ field_buffer(p->entry_fields[0], 0),
                     field_buffer(p->entry_fields[2], 0),
-                    field_buffer(p->entry_fields[1], 0));
+                    field_buffer(p->entry_fields[1], 0) });
             break;
 
         // on Backspace, backspace

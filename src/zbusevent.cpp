@@ -66,11 +66,23 @@ ZBusEvent::ZBusEvent(const QString &event,
                      const QJsonValue &data,
                      const QString &requestId)
 {
-    QStringList senderAndType = event.split(".");
+    QStringList senderAndType = event.trimmed().split(".");
     this->sender = senderAndType.value(0);
     this->type = senderAndType.value(1);
-    this->data = data;
-    this->requestId = requestId;
+    this->requestId = requestId.trimmed();
+
+    // if the data is a string, attempt to convert it into an object or array;
+    // if the data is not an object or array, it is assumed that it is a string
+    if (data.isString())
+    {
+        QString dataString = data.toString().trimmed();
+        QJsonDocument dataDoc = QJsonDocument::fromJson(dataString.toUtf8());
+        this->data = dataDoc.isNull() ? dataString : QJsonValue::fromVariant(dataDoc.toVariant());
+    }
+    else
+    {
+        this->data = data;
+    }
 }
 
 /* \brief Constructs a mock ZBusEvent for a given Mock value, from the mock event map. Optionally
