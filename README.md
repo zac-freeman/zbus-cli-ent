@@ -83,11 +83,11 @@ number that corresponds to a physical register (or thin client) that has a pinpa
 At this point, the "Credit/Debit" button should be enabled. After beginning the payment
 authorization flow from [POS][], use the mock menu in `zbus-cli-ent` to send the following events in
 order: 
-    1. `pinpad.cardInserted`
-    2. `pinpad.cardRead`
-    3. `pinpad.paymentAccepted`
-    4. `pinpad.cardRemoved`
-    5. `pinpad.finishTransaction`
+1. `pinpad.cardInserted`
+2. `pinpad.cardRead`
+3. `pinpad.paymentAccepted`
+4. `pinpad.cardRemoved`
+5. `pinpad.finishTransaction`
 
 `zbus-cli-ent` will handle populating each event with the appropriate data, `requestId`, and
 `authAttemptId`.
