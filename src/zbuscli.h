@@ -3,7 +3,7 @@
 
 #include <QObject>
 
-class State;
+class Context;
 class ZBusCliPrivate;
 class ZBusEvent;
 
@@ -38,9 +38,9 @@ public:
 
     void exec(const QUrl &zBusUrl);
     void startEventLoop();
-    State handle_command_input(int input, enum Menu current_menu, int selection);
-    State handle_peruse_input(int input, enum Menu current_menu, int selection);
-    State handle_send_input(int input, enum Menu current_menu, int selection);
+    Context handle_command_input(int input, enum Menu current_menu, int selection);
+    Context handle_peruse_input(int input, enum Menu current_menu, int selection);
+    Context handle_send_input(int input, enum Menu current_menu, int selection);
 
 signals:
     void eventSubmitted(const ZBusEvent &event);

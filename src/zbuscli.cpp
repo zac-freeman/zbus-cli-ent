@@ -154,8 +154,7 @@ static const QMap<Menu, QVector<MockMenuEntry>> mock_menu_entries
 };
 
 // The context with which the input handler should handle input.
-// TODO: rename to "Context"?
-struct State
+struct Context
 {
     Mode mode;
     Menu menu;
@@ -649,7 +648,7 @@ void ZBusCli::startEventLoop()
 {
     int current_size = 0; // size of event_history during previous cycle of event loop
     int current_top = 0;  // the index of the event in event_history at the top of the history window
-    State current
+    Context current
     {
         Mode::Command,    // the mode with which to process input
         Menu::Main,       // the current menu to display (only in command mode)
@@ -662,7 +661,7 @@ void ZBusCli::startEventLoop()
         int input = wgetch(p->entry.window);
 
         // process input with current state, and capture next state for next input
-        State next { current.mode, current.menu, current.selection };
+        Context next { current.mode, current.menu, current.selection };
         switch(current.mode)
         {
             case Mode::Command:
@@ -767,7 +766,7 @@ void ZBusCli::startEventLoop()
  *
  * \returns The context that subsequent input should be processed with.
  */
-State ZBusCli::handle_command_input(int input, Menu current_menu, int selection)
+Context ZBusCli::handle_command_input(int input, Menu current_menu, int selection)
 {
     switch(input)
     {
@@ -833,7 +832,7 @@ State ZBusCli::handle_command_input(int input, Menu current_menu, int selection)
  *
  * \returns The context that subsequent input should be processed with.
  */
-State ZBusCli::handle_send_input(int input, Menu current_menu, int selection)
+Context ZBusCli::handle_send_input(int input, Menu current_menu, int selection)
 {
     switch(input)
     {
@@ -914,7 +913,7 @@ State ZBusCli::handle_send_input(int input, Menu current_menu, int selection)
  *
  * \returns The context that subsequent input should be processed with.
  */
-State ZBusCli::handle_peruse_input(int input, Menu current_menu, int selection)
+Context ZBusCli::handle_peruse_input(int input, Menu current_menu, int selection)
 {
     switch(input)
     {
