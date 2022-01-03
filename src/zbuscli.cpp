@@ -162,9 +162,10 @@ struct State
     int selection;
 };
 
-// Stores the dimension and position of an ncurses WINDOW object.
-struct WINDOW_PROPERTIES
+// Stores the dimensions and position of an ncurses WINDOW object alongside said WINDOW object.
+struct META_WINDOW
 {
+    WINDOW *window = nullptr;
     int rows;
     int columns;
     int y;
@@ -186,19 +187,13 @@ public:
     FIELD *entry_fields[3] = {};
     FORM *entry_form = nullptr;
 
-    WINDOW *help_window = nullptr;
-    WINDOW *status_window = nullptr;
-    WINDOW *mock_menu_window = nullptr;
-    WINDOW *entry_window = nullptr;
-    WINDOW *entry_subwindow = nullptr;
-    WINDOW *history_window = nullptr;
-
-    WINDOW_PROPERTIES screen;
-    WINDOW_PROPERTIES help;
-    WINDOW_PROPERTIES status;
-    WINDOW_PROPERTIES mock_menu;
-    WINDOW_PROPERTIES entry;
-    WINDOW_PROPERTIES history;
+    META_WINDOW screen;
+    META_WINDOW help;
+    META_WINDOW status;
+    META_WINDOW mock_menu;
+    META_WINDOW entry;
+    META_WINDOW sub_entry;
+    META_WINDOW history;
 
     /* \brief Initializes ncurses and constructs the UI to use all available space in the terminal.
     */
@@ -218,24 +213,25 @@ public:
         init_pair(RED_TEXT, COLOR_RED, -1);
 
         // get width and height of screen
-        getmaxyx(stdscr, screen.rows, screen.columns);
+        screen.window = stdscr;
+        getmaxyx(screen.window, screen.rows, screen.columns);
 
         // create window to display keybinds
         help.rows = 2;
         help.columns = screen.columns;
         help.y = 0;
         help.x = screen.columns - help.columns;
-        help_window = newwin(help.rows, help.columns, help.y, help.x);
-        wmove(help_window, 0, 0);
-        wprintw(help_window, help_text[Mode::Command].toUtf8());
-        wrefresh(help_window);
+        help.window = newwin(help.rows, help.columns, help.y, help.x);
+        wmove(help.window, 0, 0);
+        wprintw(help.window, help_text[Mode::Command].toUtf8());
+        wrefresh(help.window);
 
         // create window to display connection status with zBus
         status.rows = 3;
         status.columns = screen.columns;
         status.y = help.y + help.rows;
         status.x = screen.columns - status.columns;
-        status_window = newwin(status.rows, status.columns, status.y, status.x);
+        status.window = newwin(status.rows, status.columns, status.y, status.x);
 
         // create field for input of event sender and event type
         QString event_label = "event ";
@@ -281,30 +277,30 @@ public:
         entry.columns = screen.columns;
         entry.y = status.y + status.rows;
         entry.x = screen.columns - entry.columns;
-        entry_window = newwin(entry.rows, entry.columns, entry.y, entry.x);
-        entry_subwindow = derwin(entry_window, entry.rows, entry.columns, 0, 0);
+        entry.window = newwin(entry.rows, entry.columns, entry.y, entry.x);
+        sub_entry.window = derwin(entry.window, entry.rows, entry.columns, 0, 0);
 
         // create event entry form to contain event entry fields
         entry_form = new_form(entry_fields);
-        set_form_win(entry_form, entry_window);
-        set_form_sub(entry_form, entry_subwindow);
+        set_form_win(entry_form, entry.window);
+        set_form_sub(entry_form, sub_entry.window);
         post_form(entry_form);
 
         // add labels for event entry fields
-        wmove(entry_window, event_y, 0);
-        wprintw(entry_window, event_label.toUtf8());
-        wmove(entry_window, request_id_y, 0);
-        wprintw(entry_window, request_id_label.toUtf8());
-        wmove(entry_window, data_y, 0);
-        wprintw(entry_window, data_label.toUtf8());
-        wrefresh(entry_window);
+        wmove(entry.window, event_y, 0);
+        wprintw(entry.window, event_label.toUtf8());
+        wmove(entry.window, request_id_y, 0);
+        wprintw(entry.window, request_id_label.toUtf8());
+        wmove(entry.window, data_y, 0);
+        wprintw(entry.window, data_label.toUtf8());
+        wrefresh(entry.window);
 
         // create window to display mock menu entries
         mock_menu.rows = 7;
         mock_menu.columns = screen.columns;
         mock_menu.y = status.y + status.rows;
         mock_menu.x = screen.columns - mock_menu.columns;
-        mock_menu_window = newwin(mock_menu.rows, mock_menu.columns, mock_menu.y, mock_menu.x);
+        mock_menu.window = newwin(mock_menu.rows, mock_menu.columns, mock_menu.y, mock_menu.x);
         update_mock_menu(Menu::Main);
 
         // create window for event history, using the remaining rows in the screen
@@ -312,10 +308,10 @@ public:
         history.columns = screen.columns;
         history.y = screen.rows - history.rows;
         history.x = screen.columns - history.columns;
-        history_window = newwin(history.rows, history.columns, history.y, history.x);
-        wmove(history_window, 0, 0);
-        wprintw(history_window, "Events broadcast by the zBus server will appear here.");
-        wrefresh(history_window);
+        history.window = newwin(history.rows, history.columns, history.y, history.x);
+        wmove(history.window, 0, 0);
+        wprintw(history.window, "Events broadcast by the zBus server will appear here.");
+        wrefresh(history.window);
     }
 
     /* \brief Frees up memory occupied by the ncurses windows, forms, and fields, then ends curses
@@ -323,12 +319,12 @@ public:
      */
     ~ZBusCliPrivate()
     {
-        delwin(help_window);
-        delwin(status_window);
-        delwin(entry_subwindow);
-        delwin(entry_window);
-        delwin(mock_menu_window);
-        delwin(history_window);
+        delwin(help.window);
+        delwin(status.window);
+        delwin(sub_entry.window);
+        delwin(entry.window);
+        delwin(mock_menu.window);
+        delwin(history.window);
 
         free_form(entry_form);
         free_field(entry_fields[0]);
@@ -410,7 +406,7 @@ public:
     void update_history_window(int top, int selection)
     {
         // clear event history
-        wclear(history_window);
+        wclear(history.window);
 
         // get width and height of the terminal window
         int rows = history.rows;
@@ -421,7 +417,7 @@ public:
         for (int i = top; i >= 0; i--)
         {
             // determine the height (due to line-wrapping) of the next event to be written;
-            // if the event would extend past the end of the history_window,
+            // if the event would extend past the end of the history.window,
             // do not display that event or any subsequent events
             QPair<Origin, ZBusEvent> event = event_history.at(i);
             QString prefix = origin_sign[event.first];
@@ -433,23 +429,23 @@ public:
             }
 
             // move to next row, and write event to line
-            wmove(history_window, row, 0);
+            wmove(history.window, row, 0);
 
             // if the event has been selected, make it bold
             if (i == selection)
             {
-                wattron(history_window, A_BOLD);
+                wattron(history.window, A_BOLD);
             }
-            wprintw(history_window, prefix.toUtf8());
-            wprintw(history_window, json.toUtf8());
-            wattroff(history_window, A_BOLD);
+            wprintw(history.window, prefix.toUtf8());
+            wprintw(history.window, json.toUtf8());
+            wattroff(history.window, A_BOLD);
 
             // set row for next event immediately after current event
             row = row + height;
         }
 
         // update screen
-        wrefresh(history_window);
+        wrefresh(history.window);
     }
 
     /* \brief Displays the help text corresponding to the given mode.
@@ -459,10 +455,10 @@ public:
     void update_help_text(Mode mode)
     {
         // TODO: handle multiline help text
-        wmove(help_window, 0, 0);
-        wclear(help_window);
-        wprintw(help_window, help_text[mode].toUtf8());
-        wrefresh(help_window);
+        wmove(help.window, 0, 0);
+        wclear(help.window);
+        wprintw(help.window, help_text[mode].toUtf8());
+        wrefresh(help.window);
     }
 
     /* \brief Adjusts the height of the event history window, depending on the given mode.
@@ -474,12 +470,12 @@ public:
         switch(mode)
         {
             case Mode::Command:
-                redrawwin(mock_menu_window);
-                wrefresh(mock_menu_window);
+                redrawwin(mock_menu.window);
+                wrefresh(mock_menu.window);
                 history.rows = screen.rows - (mock_menu.y + mock_menu.rows);
                 break;
             case Mode::Send:
-                redrawwin(entry_window);
+                redrawwin(entry.window);
                 history.rows = screen.rows - (entry.y + entry.rows);
                 break;
             default:
@@ -489,9 +485,9 @@ public:
 
         history.y = screen.rows - history.rows;
 
-        wresize(history_window, history.rows, history.columns);
-        mvwin(history_window, history.y, history.x);
-        wrefresh(history_window);
+        wresize(history.window, history.rows, history.columns);
+        mvwin(history.window, history.y, history.x);
+        wrefresh(history.window);
     }
 
     /* \brief Populates each of the event entry fields with the corresponding values from the given
@@ -515,15 +511,15 @@ public:
     {
         QVector<MockMenuEntry> entries = mock_menu_entries[menu];
 
-        wclear(mock_menu_window);
+        wclear(mock_menu.window);
         for (int i = 0; i < entries.size(); i++)
         {
-            wmove(mock_menu_window, i + 1, 0);
-            wprintw(mock_menu_window, QByteArray::number(i + 1));
-            wprintw(mock_menu_window, ") ");
-            wprintw(mock_menu_window, entries[i].text.toUtf8());
+            wmove(mock_menu.window, i + 1, 0);
+            wprintw(mock_menu.window, QByteArray::number(i + 1));
+            wprintw(mock_menu.window, ") ");
+            wprintw(mock_menu.window, entries[i].text.toUtf8());
         }
-        wrefresh(mock_menu_window);
+        wrefresh(mock_menu.window);
     }
 };
 
@@ -652,7 +648,7 @@ void ZBusCli::startEventLoop()
     // capture input, process pending Qt events, then update the display
     while (true)
     {
-        int input = wgetch(p->entry_window);
+        int input = wgetch(p->entry.window);
 
         // process input with current state, and capture next state for next input
         State next { current.mode, current.menu, current.selection };
@@ -691,33 +687,33 @@ void ZBusCli::startEventLoop()
         // update the connection status message
         if (p->client.isValid())
         {
-            wmove(p->status_window, 0, 0);
-            wclear(p->status_window);
-            wattron(p->status_window, COLOR_PAIR(GREEN_TEXT) | A_BOLD);
-            wprintw(p->status_window, "status: connected to zBus");
-            wattroff(p->status_window, COLOR_PAIR(GREEN_TEXT) | A_BOLD);
-            wrefresh(p->status_window);
+            wmove(p->status.window, 0, 0);
+            wclear(p->status.window);
+            wattron(p->status.window, COLOR_PAIR(GREEN_TEXT) | A_BOLD);
+            wprintw(p->status.window, "status: connected to zBus");
+            wattroff(p->status.window, COLOR_PAIR(GREEN_TEXT) | A_BOLD);
+            wrefresh(p->status.window);
         }
         else
         {
-            wmove(p->status_window, 0, 0);
-            wclrtoeol(p->status_window);
-            wattron(p->status_window, COLOR_PAIR(RED_TEXT) | A_BOLD);
-            wprintw(p->status_window, "status: disconnected from zBus");
-            wattroff(p->status_window, COLOR_PAIR(RED_TEXT) | A_BOLD);
-            wrefresh(p->status_window);
+            wmove(p->status.window, 0, 0);
+            wclrtoeol(p->status.window);
+            wattron(p->status.window, COLOR_PAIR(RED_TEXT) | A_BOLD);
+            wprintw(p->status.window, "status: disconnected from zBus");
+            wattroff(p->status.window, COLOR_PAIR(RED_TEXT) | A_BOLD);
+            wrefresh(p->status.window);
         }
 
         // if there is a connection error, display it
         if (p->client.error() != QAbstractSocket::UnknownSocketError)
         {
-            wmove(p->status_window, 1, 0);
-            wclrtoeol(p->status_window);
-            wattron(p->status_window, COLOR_PAIR(RED_TEXT) | A_BOLD);
-            wprintw(p->status_window, "error: ");
-            wprintw(p->status_window, p->client.errorString().toUtf8());
-            wattroff(p->status_window, COLOR_PAIR(RED_TEXT) | A_BOLD);
-            wrefresh(p->status_window);
+            wmove(p->status.window, 1, 0);
+            wclrtoeol(p->status.window);
+            wattron(p->status.window, COLOR_PAIR(RED_TEXT) | A_BOLD);
+            wprintw(p->status.window, "error: ");
+            wprintw(p->status.window, p->client.errorString().toUtf8());
+            wattroff(p->status.window, COLOR_PAIR(RED_TEXT) | A_BOLD);
+            wrefresh(p->status.window);
         }
 
         // if any new events have been received, or the event selection has changed,
@@ -857,7 +853,7 @@ State ZBusCli::handle_send_input(int input, Menu current_menu, int selection)
 
             // on Escape, determine whether or not this is the beginning of an "Escape Sequence"
         case '\033':
-            input = wgetch(p->entry_window);
+            input = wgetch(p->entry.window);
 
             // it's not an "Escape Sequence"; on Escape, switch to Command Mode and process
             // subsequent input
@@ -868,7 +864,7 @@ State ZBusCli::handle_send_input(int input, Menu current_menu, int selection)
 
             // it's an "Escape Sequence"; on Arrow Key, move cursor (arrow keys are received in the
             // form "Esc + [ + A")
-            switch (wgetch(p->entry_window))
+            switch (wgetch(p->entry.window))
             {
                 // Up
                 case 'A': 
@@ -911,7 +907,7 @@ State ZBusCli::handle_peruse_input(int input, Menu current_menu, int selection)
     {
         // on Escape, determine whether or not this is the beginning of an "Escape Sequence"
         case '\033':
-            input = wgetch(p->entry_window);
+            input = wgetch(p->entry.window);
 
             // it's not an "Escape Sequence"; on Escape, switch to Command Mode, clear the
             // selection, and process subsequent input
@@ -930,7 +926,7 @@ State ZBusCli::handle_peruse_input(int input, Menu current_menu, int selection)
             // it's an "Escape Sequence"; on Arrow Key, select another event (arrow keys are
             // received in the form "Esc + [ + A")
             int latest_event = p->event_history.size() - 1;
-            switch (wgetch(p->entry_window))
+            switch (wgetch(p->entry.window))
             {
                 // Up
                 case 'A':
