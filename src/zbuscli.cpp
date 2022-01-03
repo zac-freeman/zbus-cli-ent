@@ -154,20 +154,19 @@ static const QMap<Menu, QVector<MockMenuEntry>> mock_menu_entries
 };
 
 // The context with which the input handler should handle input.
-// TODO: default-initialize values here
 struct Context
 {
     // general context
-    bool connected;     // zbus connection status
-    int size;           // last recorded size of event_history
-    Mode mode;          // mode with which to process input
+    bool connected = true;      // zbus connection status
+    int size = 0;               // last recorded size of event_history
+    Mode mode = Mode::Command;  // mode with which to process input
 
     // command mode context
-    Menu menu;          // menu to display
+    Menu menu = Menu::Main;     // menu to display
 
     // peruse mode context
-    int top;            // index in event_history of event at the top of history window
-    int selection;      // index in event_history of selected event
+    int top = 0;                // index in event_history of event at the top of history window
+    int selection = -1;         // index in event_history of selected event (-1 == no selection)
 };
 
 // Stores the dimensions and position of an ncurses WINDOW object alongside said WINDOW object.
@@ -696,15 +695,7 @@ void ZBusCli::onZBusEventReceived(const ZBusEvent &event)
  */
 void ZBusCli::startEventLoop()
 {
-    Context current
-    {
-        /* connected */ true,
-        /* size */ 0,
-        /* mode */ Mode::Command,
-        /* menu */ Menu::Main,
-        /* top */ 0,
-        /* selected */ -1
-    };
+    Context current;
 
     // capture input, process pending Qt events, then update the display
     while (true)
