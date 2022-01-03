@@ -180,7 +180,7 @@ public:
     QList<QPair<Origin, ZBusEvent>> event_history;  // list of all events to and from zBus
     QString current_request_id;                     // last requestId received from zBus event
     QString current_auth_attempt_id;                // last authAttemptId received from zBus event
-    bool pinpad_simulator_enabled;
+    bool pinpad_simulator_enabled;                  // simulates affirmative responses from pinpad
     ZWebSocket client;                              // sender and receiver of zBus events
 
     FIELD *entry_fields[3] = {};
@@ -238,13 +238,12 @@ public:
         status_window = newwin(status.rows, status.columns, status.y, status.x);
 
         // create field for input of event sender and event type
-        // TODO: standardize rows definition (used space + gap, or just used space?)
-        QString event_label = "event";
-        int event_rows = 1;
-        int event_columns = screen.columns - (event_label.size() + 1);
+        QString event_label = "event ";
+        int event_rows = 2;
+        int event_columns = screen.columns - event_label.size();
         int event_y = 0;
         int event_x = screen.columns - event_columns;
-        entry_fields[0] = new_field(event_rows, event_columns, event_y, event_x, 0, 0);
+        entry_fields[0] = new_field(event_rows - 1, event_columns, event_y, event_x, 0, 0);
         set_field_back(entry_fields[0], A_UNDERLINE);
         field_opts_off(entry_fields[0], O_AUTOSKIP);
         field_opts_off(entry_fields[0], O_STATIC);
@@ -252,12 +251,12 @@ public:
         field_opts_off(entry_fields[0], O_WRAP);
 
         // create field for input of requestId
-        QString request_id_label = "requestId";
-        int request_id_rows = 1;
-        int request_id_columns = screen.columns - (request_id_label.size() + 1);
-        int request_id_y = event_y + event_rows + 1;
+        QString request_id_label = "requestId ";
+        int request_id_rows = 2;
+        int request_id_columns = screen.columns - request_id_label.size();
+        int request_id_y = event_y + event_rows;
         int request_id_x = screen.columns - request_id_columns;
-        entry_fields[1] = new_field(request_id_rows, request_id_columns, request_id_y, request_id_x, 0, 0);
+        entry_fields[1] = new_field(request_id_rows - 1, request_id_columns, request_id_y, request_id_x, 0, 0);
         set_field_back(entry_fields[1], A_UNDERLINE);
         field_opts_off(entry_fields[1], O_AUTOSKIP);
         field_opts_off(entry_fields[1], O_STATIC);
@@ -265,12 +264,12 @@ public:
         field_opts_off(entry_fields[1], O_WRAP);
 
         // create field for input of event data
-        QString data_label = "data";
-        int data_rows = 5;
-        int data_columns = screen.columns - (data_label.size() + 1);
-        int data_y = request_id_y + request_id_rows + 1;
+        QString data_label = "data ";
+        int data_rows = 6;
+        int data_columns = screen.columns - data_label.size();
+        int data_y = request_id_y + request_id_rows;
         int data_x = screen.columns - data_columns;
-        entry_fields[2] = new_field(data_rows, data_columns, data_y, data_x, 0, 0);
+        entry_fields[2] = new_field(data_rows - 1, data_columns, data_y, data_x, 0, 0);
         set_field_back(entry_fields[2], A_UNDERLINE);
         field_opts_off(entry_fields[2], O_AUTOSKIP);
         field_opts_off(entry_fields[2], O_STATIC);
@@ -278,7 +277,7 @@ public:
         field_opts_off(entry_fields[2], O_WRAP);
 
         // create window to contain event entry form
-        entry.rows = (event_rows + 1) + (request_id_rows + 1) + (data_rows + 1);
+        entry.rows = event_rows + request_id_rows + data_rows;
         entry.columns = screen.columns;
         entry.y = status.y + status.rows;
         entry.x = screen.columns - entry.columns;
@@ -292,11 +291,11 @@ public:
         post_form(entry_form);
 
         // add labels for event entry fields
-        wmove(entry_window, 0, 0);
+        wmove(entry_window, event_y, 0);
         wprintw(entry_window, event_label.toUtf8());
-        wmove(entry_window, 2, 0);
+        wmove(entry_window, request_id_y, 0);
         wprintw(entry_window, request_id_label.toUtf8());
-        wmove(entry_window, 4, 0);
+        wmove(entry_window, data_y, 0);
         wprintw(entry_window, data_label.toUtf8());
         wrefresh(entry_window);
 
