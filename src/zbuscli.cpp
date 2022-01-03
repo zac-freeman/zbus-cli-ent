@@ -527,15 +527,12 @@ public:
         switch(mode)
         {
             case Mode::Command:
-                redrawwin(mock_menu.window);
-                wrefresh(mock_menu.window);
                 history.rows = screen.rows - (mock_menu.y + mock_menu.rows);
                 break;
             case Mode::Send:
-                redrawwin(entry.window);
                 history.rows = screen.rows - (entry.y + entry.rows);
                 break;
-            default:
+            case Mode::Peruse:
                 history.rows = screen.rows - (status.y + status.rows);
                 break;
         }
@@ -578,7 +575,15 @@ public:
             wprintw(mock_menu.window, ") ");
             wprintw(mock_menu.window, entries[i].text.toUtf8());
         }
+        redrawwin(mock_menu.window);
         wrefresh(mock_menu.window);
+    }
+
+    void update_entry_form()
+    {
+        entry.y = status.y + status.rows;
+        entry.regenerate();
+        redrawwin(entry.window);
     }
 };
 
@@ -744,6 +749,13 @@ void ZBusCli::startEventLoop()
         if ((changes_above && next.mode == Mode::Command) || current.menu != next.menu)
         {
             p->update_mock_menu(next.menu);
+            changes_above = true;
+        }
+
+        // if anything above has changed, update the entry form
+        if (changes_above && next.mode == Mode::Send)
+        {
+            p->update_entry_form();
             changes_above = true;
         }
 
