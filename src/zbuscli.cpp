@@ -496,8 +496,7 @@ public:
 
         history.y = screen.rows - history.rows;
 
-        wresize(history.window, history.rows, history.columns);
-        mvwin(history.window, history.y, history.x);
+        history.regenerate(history.rows, history.columns, history.y, history.x);
         wrefresh(history.window);
     }
 
