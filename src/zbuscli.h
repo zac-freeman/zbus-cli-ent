@@ -38,9 +38,9 @@ public:
 
     void exec(const QUrl &zBusUrl);
     void startEventLoop();
-    Context handle_command_input(int input, enum Menu current_menu, int selection);
-    Context handle_peruse_input(int input, enum Menu current_menu, int selection);
-    Context handle_send_input(int input, enum Menu current_menu, int selection);
+    Context handle_command_input(int input, Context context);
+    Context handle_peruse_input(int input, Context context);
+    Context handle_send_input(int input, Context context);
 
 signals:
     void eventSubmitted(const ZBusEvent &event);
