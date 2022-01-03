@@ -4,7 +4,7 @@ services:
   # Common settings for other services. You can inherit this by using:
   #   <<: *common
   x-common: &common
-    image: docker.artifactory.autozone.com/release/store-operations/el7-build:kafka.2021.03.15
+    image: docker.artifactory.autozone.com/release/store-operations/el7-build:2021.11.19
     working_dir: /workspace
     volumes:
       - "./:/workspace"
