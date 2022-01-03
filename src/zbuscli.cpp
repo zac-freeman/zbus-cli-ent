@@ -170,6 +170,17 @@ struct META_WINDOW
     int columns;
     int y;
     int x;
+
+    void regenerate(int rows, int columns, int y, int x)
+    {
+        this->rows = rows;
+        this->columns = columns;
+        this->y = y;
+        this->x = x;
+
+        wresize(window, this->rows, this->columns);
+        mvwin(window, this->y, this->x);
+    }
 };
 
 /* The private implementation for `ZBusCli`. Contains logic for handling inbound/outbound zBus
@@ -503,7 +514,7 @@ public:
     }
 
     /* \brief Generates a visual list from the menu entries associated with the given menu value,
-     *        then writes it to the mock menu window.
+     *        resizes the window to fit the content, then writes it to the mock menu window.
      *
      * \param <menu> The menu to be displayed.
      */
@@ -512,9 +523,10 @@ public:
         QVector<MockMenuEntry> entries = mock_menu_entries[menu];
 
         wclear(mock_menu.window);
+        mock_menu.regenerate(entries.size() + 1, mock_menu.columns, mock_menu.y, mock_menu.x);
         for (int i = 0; i < entries.size(); i++)
         {
-            wmove(mock_menu.window, i + 1, 0);
+            wmove(mock_menu.window, i, 0);
             wprintw(mock_menu.window, QByteArray::number(i + 1));
             wprintw(mock_menu.window, ") ");
             wprintw(mock_menu.window, entries[i].text.toUtf8());
@@ -670,10 +682,12 @@ void ZBusCli::startEventLoop()
         // before updating the display, process pending Qt events
         QCoreApplication::processEvents();
 
-        // if the menu selection has changed, update the menu
+        // if the menu selection has changed, update the menu, and resize the history to fill the
+        // available space
         if (current.menu != next.menu)
         {
             p->update_mock_menu(next.menu);
+            p->resize_history_window(next.mode);
         }
 
         // if the mode has changed, update the help text and resize the history to fill the available
