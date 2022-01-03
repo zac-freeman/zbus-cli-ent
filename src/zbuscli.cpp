@@ -246,7 +246,7 @@ public:
         help.x = screen.columns - help.columns;
         help.window = newwin(help.rows, help.columns, help.y, help.x);
         wmove(help.window, 0, 0);
-        wprintw(help.window, help_text[Mode::Command].toUtf8());
+        wprintw(help.window, help_text.value(Mode::Command).toUtf8());
         wrefresh(help.window);
 
         // create window to display connection status with zBus
@@ -389,7 +389,7 @@ public:
         for (int i = current_top; i >= next_selection; i--)
         {
             QPair<Origin, ZBusEvent> event = event_history.at(i);
-            QString prefix = origin_sign[event.first];
+            QString prefix = origin_sign.value(event.first);
             QString json = event.second.toJson();
             int height = ((prefix.size() + json.size() - 1) / columns) + 1;
             event_heights.enqueue(height);
@@ -443,7 +443,7 @@ public:
             // if the event would extend past the end of the history.window,
             // do not display that event or any subsequent events
             QPair<Origin, ZBusEvent> event = event_history.at(i);
-            QString prefix = origin_sign[event.first];
+            QString prefix = origin_sign.value(event.first);
             QString json = event.second.toJson();
             int height = ((prefix.size() + json.size() - 1) / columns) + 1;
             if (row + height > rows)
@@ -480,7 +480,7 @@ public:
         // TODO: handle multiline help text
         wmove(help.window, 0, 0);
         wclear(help.window);
-        wprintw(help.window, help_text[mode].toUtf8());
+        wprintw(help.window, help_text.value(mode).toUtf8());
         wrefresh(help.window);
     }
 
@@ -562,7 +562,7 @@ public:
      */
     void update_mock_menu(Menu menu)
     {
-        QVector<MockMenuEntry> entries = mock_menu_entries[menu];
+        QVector<MockMenuEntry> entries = mock_menu_entries.value(menu);
 
         wclear(mock_menu.window);
         mock_menu.rows = entries.size() + 1;
@@ -573,7 +573,7 @@ public:
             wmove(mock_menu.window, i, 0);
             wprintw(mock_menu.window, QByteArray::number(i + 1));
             wprintw(mock_menu.window, ") ");
-            wprintw(mock_menu.window, entries[i].text.toUtf8());
+            wprintw(mock_menu.window, entries.at(i).text.toUtf8());
         }
         redrawwin(mock_menu.window);
         wrefresh(mock_menu.window);
@@ -818,7 +818,7 @@ Context ZBusCli::handle_command_input(int input, Context context)
         case '9':
             {
                 int index = QByteArray(1, input).toInt() - 1;
-                MockMenuEntry entry = mock_menu_entries[context.menu].value(index); //TODO: replace operator[] with .at() and .value() everywhere
+                MockMenuEntry entry = mock_menu_entries.value(context.menu).value(index);
 
                 // if the selection refers to another menu, display the next menu
                 if (entry.menu != Menu::None)
