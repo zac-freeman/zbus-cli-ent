@@ -622,7 +622,7 @@ void ZBusCli::exec(const QUrl &zBusUrl)
     p->client.open(zBusUrl);
 
     // wait for input and update display
-    startEventLoop();
+    handle_input(Context{});
 }
 
 /* \brief Attempts to connect to zBus after a delay. This is connected to ZWebSocket's disconnected
@@ -688,7 +688,7 @@ void ZBusCli::onZBusEventReceived(const ZBusEvent &event)
                         || response == Mock::PinpadCardInfo) ? 5000 : 100;
             QTimer::singleShot(
                     timeout,
-                    [response, this] { onEventSubmitted({ response,
+                    [this, response] { onEventSubmitted({ response,
                                                         p->current_request_id,
                                                         p->current_auth_attempt_id });});
         }
@@ -697,101 +697,98 @@ void ZBusCli::onZBusEventReceived(const ZBusEvent &event)
 
 /* \brief Starts an infinite loop that waits for input, processes pending Qt events, and updates the
  *        display. Forever.
+ *
+ * \param <current> The context with which to handle the input from the user.
  */
-void ZBusCli::startEventLoop()
+void ZBusCli::handle_input(Context current)
 {
-    Context current;
+    // capture input
+    int input = wgetch(p->entry.window);
 
-    // capture input, process pending Qt events, then update the display
-    while (true)
+    // process input with current context, and update context for next input
+    Context next;
+    switch(current.mode)
     {
-        int input = wgetch(p->entry.window);
+        case Mode::Command:
+            next = handle_command_input(input, current);
+            break;
 
-        // process input with current state, and capture next state for next input
-        Context next;
-        switch(current.mode)
-        {
-            case Mode::Command:
-                next = handle_command_input(input, current);
-                break;
+        case Mode::Send:
+            next = handle_send_input(input, current);
+            break;
 
-            case Mode::Send:
-                next = handle_send_input(input, current);
-                break;
-
-            case Mode::Peruse:
-                next = handle_peruse_input(input, current);
-                break;
-        }
-
-        // before updating the display, process pending Qt events
-        QCoreApplication::processEvents();
-
-        // tracks if there have been any window changes that need to be propogated to lower windows
-        bool changes_above = false;
-
-        // if the mode has changed, update the help text
-        if (current.mode != next.mode)
-        {
-            p->update_help_text(next.mode);
-            changes_above = true;
-        }
-
-        // if anything above has changed or the connection status has changed, update the status
-        if (changes_above || current.connected != p->client.isValid())
-        {
-            next.connected = p->client.isValid();
-            p->update_status(next.connected, p->client.errorString());
-            changes_above = true;
-        }
-
-        // if anything above has changed or the menu selection has changed, update the menu
-        if ((changes_above && next.mode == Mode::Command) || current.menu != next.menu)
-        {
-            p->update_mock_menu(next.menu);
-            changes_above = true;
-        }
-
-        // if anything above has changed, update the entry form
-        if (changes_above && next.mode == Mode::Send)
-        {
-            p->update_entry_form();
-            changes_above = true;
-        }
-
-        // if anything above has changed, update the history window
-        if (changes_above)
-        {
-            p->resize_history_window(next.mode);
-        }
-
-        // the event selection has changed, if any new events have been received, or the mode has
-        // changed, update the event history
-        next.size = p->event_history.size();
-        if (next.selection != current.selection ||
-            next.size > current.size ||
-            current.mode != next.mode)
-        {
-            next.top = p->find_top_for_selection(current.top, next.selection);
-            p->update_history_window(next.top, next.selection);
-        }
-
-        // if entry fields are visible, return cursor to last position in current field
-        // otherwise, hide the cursor
-        // TODO: put the cursor somewhere in other modes?
-        if (next.mode == Mode::Send)
-        {
-            curs_set(1);
-            pos_form_cursor(p->entry_form);
-        }
-        else
-        {
-            curs_set(0);
-        }
-
-        // update state for processing next input
-        current = next;
+        case Mode::Peruse:
+            next = handle_peruse_input(input, current);
+            break;
     }
+
+    // before updating the display, process pending Qt events
+    QCoreApplication::processEvents();
+
+    // tracks if there have been any window changes that need to be propogated to lower windows
+    bool changes_above = false;
+
+    // if the mode has changed, update the help text
+    if (current.mode != next.mode)
+    {
+        p->update_help_text(next.mode);
+        changes_above = true;
+    }
+
+    // if anything above has changed or the connection status has changed, update the status
+    if (changes_above || current.connected != p->client.isValid())
+    {
+        next.connected = p->client.isValid();
+        p->update_status(next.connected, p->client.errorString());
+        changes_above = true;
+    }
+
+    // if anything above has changed or the menu selection has changed, update the menu
+    if ((changes_above && next.mode == Mode::Command) || current.menu != next.menu)
+    {
+        p->update_mock_menu(next.menu);
+        changes_above = true;
+    }
+
+    // if anything above has changed, update the entry form
+    if (changes_above && next.mode == Mode::Send)
+    {
+        p->update_entry_form();
+        changes_above = true;
+    }
+
+    // if anything above has changed, update the history window
+    if (changes_above)
+    {
+        p->resize_history_window(next.mode);
+    }
+
+    // the event selection has changed, if any new events have been received, or the mode has
+    // changed, update the event history
+    next.size = p->event_history.size();
+    if (next.selection != current.selection ||
+        next.size > current.size ||
+        current.mode != next.mode)
+    {
+        next.top = p->find_top_for_selection(current.top, next.selection);
+        p->update_history_window(next.top, next.selection);
+    }
+
+    // if entry fields are visible, return cursor to last position in current field
+    // otherwise, hide the cursor
+    // TODO: put the cursor somewhere in other modes?
+    if (next.mode == Mode::Send)
+    {
+        curs_set(1);
+        pos_form_cursor(p->entry_form);
+    }
+    else
+    {
+        curs_set(0);
+    }
+
+    // process next input with new context
+    QTimer::singleShot(0, this, [this, next] { handle_input(next); });
 }
 
 /* \brief Handles input received while the client is in Command mode.

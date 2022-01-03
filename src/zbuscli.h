@@ -37,7 +37,7 @@ public:
     ~ZBusCli();
 
     void exec(const QUrl &zBusUrl);
-    void startEventLoop();
+    void handle_input(Context current);
     Context handle_command_input(int input, Context context);
     Context handle_peruse_input(int input, Context context);
     Context handle_send_input(int input, Context context);
