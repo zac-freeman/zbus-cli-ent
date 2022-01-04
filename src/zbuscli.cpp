@@ -358,6 +358,116 @@ public:
         endwin();
     }
 
+    /* \brief Displays the help text corresponding to the given mode.
+     *
+     * \param <mode> Mode for which the help text should be displayed.
+     */
+    void update_help_text(Mode mode)
+    {
+        // TODO: handle multiline help text
+        wmove(help.window, 0, 0);
+        wclear(help.window);
+        wprintw(help.window, help_text.value(mode).toUtf8());
+        wrefresh(help.window);
+    }
+
+    /*  \brief Displays the status of the pinpad simulator and the zbus connection.
+     *
+     *  \param <pinpad_simulated> Indicator of whether the pinpad simulator is enabled.
+     *  \param <connected> Indicator of whether the websocket is connected to zbus.
+     *  \param <error> The error encountered while trying to connect to zBus.
+     */
+    void update_status(bool pinpad_simulated, bool connected, QString error)
+    {
+        wclear(status.window);
+
+        status.rows = 2 + !connected + pinpad_simulated;
+        status.y = help.y + help.rows;
+        status.regenerate();
+
+        int row = 0;
+        wmove(status.window, row, 0);
+
+        if (pinpad_simulated)
+        {
+            wattron(status.window, A_BOLD);
+            wprintw(status.window, "pinpad simulator enabled");
+            wattroff(status.window, A_BOLD);
+
+            row++;
+            wmove(status.window, row, 0);
+        }
+
+        // update the status message and error message
+        if (connected)
+        {
+            wattron(status.window, COLOR_PAIR(GREEN_TEXT) | A_BOLD);
+            wprintw(status.window, "status: connected to zBus");
+            wattroff(status.window, COLOR_PAIR(GREEN_TEXT) | A_BOLD);
+        }
+        else
+        {
+            wattron(status.window, COLOR_PAIR(RED_TEXT) | A_BOLD);
+            wprintw(status.window, "status: disconnected from zBus");
+            wattroff(status.window, COLOR_PAIR(RED_TEXT) | A_BOLD);
+            row++;
+
+            // display the error message from the websocket
+            wmove(status.window, row, 0);
+            wattron(status.window, COLOR_PAIR(RED_TEXT) | A_BOLD);
+            wprintw(status.window, "error: ");
+            wprintw(status.window, error.toUtf8());
+            wattroff(status.window, COLOR_PAIR(RED_TEXT) | A_BOLD);
+        }
+
+        wrefresh(status.window);
+    }
+
+    /* \brief Generates a visual list from the menu entries associated with the given menu value,
+     *        resizes the window to fit the content, then writes it to the mock menu window.
+     *
+     * \param <menu> The menu to be displayed.
+     */
+    void update_mock_menu(Menu menu)
+    {
+        QVector<MockMenuEntry> entries = mock_menu_entries.value(menu);
+
+        wclear(mock_menu.window);
+        mock_menu.rows = entries.size() + 1;
+        mock_menu.y = status.y + status.rows;
+        mock_menu.regenerate();
+        for (int i = 0; i < entries.size(); i++)
+        {
+            wmove(mock_menu.window, i, 0);
+            wprintw(mock_menu.window, QByteArray::number(i + 1));
+            wprintw(mock_menu.window, ") ");
+            wprintw(mock_menu.window, entries.at(i).text.toUtf8());
+        }
+        redrawwin(mock_menu.window);
+        wrefresh(mock_menu.window);
+    }
+
+    /* \brief Repositions the entry window underneatht the status window.
+     */
+    void update_entry_form()
+    {
+        entry.y = status.y + status.rows;
+        entry.regenerate();
+        redrawwin(entry.window);
+    }
+
+    /* \brief Populates each of the event entry fields with the corresponding values from the given
+     *        event
+     *
+     * \param <event> The zBus event to be inserted into the entry form.
+     */
+    void insert_event(ZBusEvent event)
+    {
+        set_field_buffer(entry_fields[0], 0, event.name().toUtf8());
+        set_field_buffer(entry_fields[1], 0, event.requestId.toUtf8());
+        set_field_buffer(entry_fields[2], 0, event.dataString().toUtf8());
+    }
+
     /* \brief Returns the index of the event in the event_history, nearest to the current top, that
      *        accomodates displaying the selected event on screen.
      *
@@ -472,65 +582,6 @@ public:
         wrefresh(history.window);
     }
 
-    /* \brief Displays the help text corresponding to the given mode.
-     *
-     * \param <mode> Mode for which the help text should be displayed.
-     */
-    void update_help_text(Mode mode)
-    {
-        // TODO: handle multiline help text
-        wmove(help.window, 0, 0);
-        wclear(help.window);
-        wprintw(help.window, help_text.value(mode).toUtf8());
-        wrefresh(help.window);
-    }
-
-    void update_status(bool pinpad_simulated, bool connected, QString error)
-    {
-        wclear(status.window);
-
-        status.rows = 2 + !connected + pinpad_simulated;
-        status.y = help.y + help.rows;
-        status.regenerate();
-
-        int row = 0;
-        wmove(status.window, row, 0);
-
-        if (pinpad_simulated)
-        {
-            wattron(status.window, A_BOLD);
-            wprintw(status.window, "pinpad simulator enabled");
-            wattroff(status.window, A_BOLD);
-
-            row++;
-            wmove(status.window, row, 0);
-        }
-
-        // update the status message and error message
-        if (connected)
-        {
-            wattron(status.window, COLOR_PAIR(GREEN_TEXT) | A_BOLD);
-            wprintw(status.window, "status: connected to zBus");
-            wattroff(status.window, COLOR_PAIR(GREEN_TEXT) | A_BOLD);
-        }
-        else
-        {
-            wattron(status.window, COLOR_PAIR(RED_TEXT) | A_BOLD);
-            wprintw(status.window, "status: disconnected from zBus");
-            wattroff(status.window, COLOR_PAIR(RED_TEXT) | A_BOLD);
-            row++;
-
-            // display the error message from the websocket
-            wmove(status.window, row, 0);
-            wattron(status.window, COLOR_PAIR(RED_TEXT) | A_BOLD);
-            wprintw(status.window, "error: ");
-            wprintw(status.window, error.toUtf8());
-            wattroff(status.window, COLOR_PAIR(RED_TEXT) | A_BOLD);
-        }
-
-        wrefresh(status.window);
-    }
-
     /* \brief Adjusts the height of the event history window, depending on the given mode.
      *
      * \param <mode> Mode for which the history window should be resized.
@@ -554,49 +605,6 @@ public:
 
         history.regenerate();
         wrefresh(history.window);
-    }
-
-    /* \brief Populates each of the event entry fields with the corresponding values from the given
-     *        event
-     *
-     * \param <event> The zBus event to be inserted into the entry form.
-     */
-    void insert_event(ZBusEvent event)
-    {
-        set_field_buffer(entry_fields[0], 0, event.name().toUtf8());
-        set_field_buffer(entry_fields[1], 0, event.requestId.toUtf8());
-        set_field_buffer(entry_fields[2], 0, event.dataString().toUtf8());
-    }
-
-    /* \brief Generates a visual list from the menu entries associated with the given menu value,
-     *        resizes the window to fit the content, then writes it to the mock menu window.
-     *
-     * \param <menu> The menu to be displayed.
-     */
-    void update_mock_menu(Menu menu)
-    {
-        QVector<MockMenuEntry> entries = mock_menu_entries.value(menu);
-
-        wclear(mock_menu.window);
-        mock_menu.rows = entries.size() + 1;
-        mock_menu.y = status.y + status.rows;
-        mock_menu.regenerate();
-        for (int i = 0; i < entries.size(); i++)
-        {
-            wmove(mock_menu.window, i, 0);
-            wprintw(mock_menu.window, QByteArray::number(i + 1));
-            wprintw(mock_menu.window, ") ");
-            wprintw(mock_menu.window, entries.at(i).text.toUtf8());
-        }
-        redrawwin(mock_menu.window);
-        wrefresh(mock_menu.window);
-    }
-
-    void update_entry_form()
-    {
-        entry.y = status.y + status.rows;
-        entry.regenerate();
-        redrawwin(entry.window);
     }
 };
 
