@@ -74,6 +74,10 @@ Test the connection to zBus (note the exclusion of the `ws://` protocol from the
 
 ### Mocking the Pinpad
 
+**DEPRECATED**: Mocking the pinpad can now be automated by toggling on the pinpad simulator in
+command mode with `m`. With an SSH tunnel to [zBus][] and [Gemini][] , the pinpad simulator will
+emit the events listed below when it detects that POS has started the payment flow.
+
 To convince a local instance of [POS][] that it is connected to a pinpad, open an SSH tunnel for
 [zBus][] and [Gemini][] to a physical store box with pinpads connected. In [POS][], select a register
 number that corresponds to a physical register (or thin client) that has a pinpad. To clear the
