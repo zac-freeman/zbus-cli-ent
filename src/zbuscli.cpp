@@ -157,16 +157,17 @@ static const QMap<Menu, QVector<MockMenuEntry>> mock_menu_entries
 struct Context
 {
     // general context
-    bool connected = true;      // zbus connection status
-    int size = 0;               // last recorded size of event_history
-    Mode mode = Mode::Command;  // mode with which to process input
+    bool pinpad_simulated = false;  // simulates affirmative responses from pinpad
+    bool connected = true;          // zbus connection status
+    int size = 0;                   // last recorded size of event_history
+    Mode mode = Mode::Command;      // mode with which to process input
 
     // command mode context
-    Menu menu = Menu::Main;     // menu to display
+    Menu menu = Menu::Main;         // menu to display
 
     // peruse mode context
-    int top = 0;                // index in event_history of event at the top of history window
-    int selection = -1;         // index in event_history of selected event (-1 == no selection)
+    int top = 0;                    // index in event_history of event at the top of history window
+    int selection = -1;             // index in event_history of selected event (-1 == no selection)
 };
 
 // Stores the dimensions and position of an ncurses WINDOW object alongside said WINDOW object.
@@ -204,7 +205,7 @@ public:
     QList<QPair<Origin, ZBusEvent>> event_history;  // list of all events to and from zBus
     QString current_request_id;                     // last requestId received from zBus event
     QString current_auth_attempt_id;                // last authAttemptId received from zBus event
-    bool pinpad_simulator_enabled;                  // simulates affirmative responses from pinpad
+    bool pinpad_simulated;                          // simulates affirmative responses from pinpad
     ZWebSocket client;                              // sender and receiver of zBus events
 
     FIELD *entry_fields[3] = {};
@@ -484,15 +485,26 @@ public:
         wrefresh(help.window);
     }
 
-    void update_status(bool connected, QString error)
+    void update_status(bool pinpad_simulated, bool connected, QString error)
     {
         wclear(status.window);
 
-        status.rows = connected ? 2 : 3;
+        status.rows = 2 + !connected + pinpad_simulated;
         status.y = help.y + help.rows;
         status.regenerate();
 
-        wmove(status.window, 0, 0);
+        int row = 0;
+        wmove(status.window, row, 0);
+
+        if (pinpad_simulated)
+        {
+            wattron(status.window, A_BOLD);
+            wprintw(status.window, "pinpad simulator enabled");
+            wattroff(status.window, A_BOLD);
+
+            row++;
+            wmove(status.window, row, 0);
+        }
 
         // update the status message and error message
         if (connected)
@@ -506,9 +518,10 @@ public:
             wattron(status.window, COLOR_PAIR(RED_TEXT) | A_BOLD);
             wprintw(status.window, "status: disconnected from zBus");
             wattroff(status.window, COLOR_PAIR(RED_TEXT) | A_BOLD);
+            row++;
 
             // display the error message from the websocket
-            wmove(status.window, 1, 0);
+            wmove(status.window, row, 0);
             wattron(status.window, COLOR_PAIR(RED_TEXT) | A_BOLD);
             wprintw(status.window, "error: ");
             wprintw(status.window, error.toUtf8());
@@ -677,7 +690,7 @@ void ZBusCli::onZBusEventReceived(const ZBusEvent &event)
                                                            : auth_attempt_id;
 
     // if the pinpad simulator is enabled, attempt to respond to the event
-    if (p->pinpad_simulator_enabled)
+    if (p->pinpad_simulated)
     {
         QVector<Mock> responses = pinpad_simulator_responses.value(event.name());
         foreach (Mock response, responses)
@@ -735,11 +748,14 @@ void ZBusCli::handle_input(Context current)
         changes_above = true;
     }
 
-    // if anything above has changed or the connection status has changed, update the status
-    if (changes_above || current.connected != p->client.isValid())
+    // if anything above has changed, the connection status has changed, or the pinpad simulated has
+    // been toggled, update the status
+    if (changes_above ||
+        current.connected != p->client.isValid() ||
+        current.pinpad_simulated != next.pinpad_simulated)
     {
         next.connected = p->client.isValid();
-        p->update_status(next.connected, p->client.errorString());
+        p->update_status(next.pinpad_simulated, next.connected, p->client.errorString());
         changes_above = true;
     }
 
@@ -854,7 +870,8 @@ Context ZBusCli::handle_command_input(int input, Context context)
 
         // On "m", toggle the pinpad simulator:
         case 'm':
-            p->pinpad_simulator_enabled = !p->pinpad_simulator_enabled; // TODO: move into context?
+            context.pinpad_simulated = !context.pinpad_simulated;
+            p->pinpad_simulated = context.pinpad_simulated;
             return context;
 
         // On all other input, do nothing
