@@ -800,16 +800,10 @@ void ZBusCli::handle_input(Context current)
     }
 
     // if entry fields are visible, return cursor to last position in current field
-    // otherwise, hide the cursor
-    // TODO: put the cursor somewhere in other modes?
+    // otherwise, place the cursor at the end of the help text
     if (next.mode == Mode::Send)
     {
-        curs_set(1);
         pos_form_cursor(p->entry_form);
-    }
-    else
-    {
-        curs_set(0);
     }
 
     // process next input with new context
