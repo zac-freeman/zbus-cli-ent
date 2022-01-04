@@ -747,9 +747,6 @@ void ZBusCli::handle_input(Context current)
             break;
     }
 
-    // before updating the display, process pending Qt events
-    QCoreApplication::processEvents();
-
     // tracks if there have been any window changes that need to be propogated to lower windows
     bool changes_above = false;
 
