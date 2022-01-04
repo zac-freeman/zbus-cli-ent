@@ -43,11 +43,10 @@ static const QMap<Direction, QString> direction_sign
 // Maps each mode to the corresponding help text to be displayed.
 static const QMap<Mode, QString> help_text
 {
-    { Mode::Command, "Ctrl+C) exit program, s) begin send mode, p) begin peruse mode, "
+    { Mode::Command, "Ctrl+C) exit program, Esc) back, s) begin send mode, p) begin peruse mode, "
                      "m) toggle pinpad simulator" },
-    { Mode::Send, "Ctrl+C) exit program, Esc) begin command mode, Tab) switch field, "
-                  "Enter) send event" },
-    { Mode::Peruse, "Ctrl+C) exit program, Esc) begin command mode" }
+    { Mode::Send, "Ctrl+C) exit program, Esc) back, Tab) switch field, Enter) send event" },
+    { Mode::Peruse, "Ctrl+C) exit program, Esc) back" }
 };
 
 /* A container for the data associated with each entry in the mock menu. An instance of
@@ -83,7 +82,8 @@ static const QMap<QString, QVector<Mock>> pinpad_simulator_responses
  * cycles introduced by the "back" option) where branches point to lists of mock menu entries, and
  * leaves point to a mock event.
  *
- * Each menu (besides the root/main menu) should contain a "back" option.
+ * Each menu (besides the root/main menu) should contain a "back" option as its last entry. This
+ * "back" option isn't displayed; it is used to determine what the previous menu is.
  */
 static const QMap<Menu, QVector<MockMenuEntry>> mock_menu_entries
 {
@@ -426,17 +426,24 @@ public:
     /* \brief Generates a visual list from the menu entries associated with the given menu value,
      *        resizes the window to fit the content, then writes it to the mock menu window.
      *
+     *        This function assumes that every menu, excluding the main menu, has a "back" option as
+     *        its last entry. The "back" option is not displayed; it is used to determine what the
+     *        previous menu is.
+     *
      * \param <menu> The menu to be displayed.
      */
     void update_mock_menu(Menu menu)
     {
         QVector<MockMenuEntry> entries = mock_menu_entries.value(menu);
 
+        // the main menu does not have a back entry - all of its entries will be displayed
+        int entries_to_display = menu == Menu::Main ? entries.size() : entries.size() - 1;
+
         wclear(mock_menu.window);
-        mock_menu.rows = entries.size() + 1;
+        mock_menu.rows = entries_to_display + 1;
         mock_menu.y = status.y + status.rows;
         mock_menu.regenerate();
-        for (int i = 0; i < entries.size(); i++)
+        for (int i = 0; i < entries_to_display; i++)
         {
             wmove(mock_menu.window, i, 0);
             wprintw(mock_menu.window, QByteArray::number(i + 1));
@@ -823,8 +830,30 @@ Context ZBusCli::handle_command_input(int input, Context context)
 {
     switch(input)
     {
-        // On any number, try to select a corresponding entry from the current menu
-        case '0':
+        // on Escape, determine whether or not this is the beginning of an "Escape Sequence"
+        case '\033':
+            // if it's the beginning of an escape sequence, ignore it
+            input = wgetch(p->entry.window);
+            if (input == '[')
+            {
+                wgetch(p->entry.window);
+                return context;
+            }
+
+            // if it'sn't the beginning of an escape sequence, try to switch to the previous menu
+            {
+                // if on the main menu, ignore attempts to go back
+                if (context.menu == Menu::Main)
+                {
+                    return context;
+                }
+
+                QVector<MockMenuEntry> entries = mock_menu_entries.value(context.menu);
+                context.menu = entries.value(entries.size() - 1).menu;
+                return context;
+            }
+
+        // On any possible ordinal, try to select a corresponding entry from the current menu
         case '1':
         case '2':
         case '3':
@@ -907,7 +936,7 @@ Context ZBusCli::handle_send_input(int input, Context context)
             form_driver(p->entry_form, REQ_END_LINE);
             break;
 
-        // On Enter, send the contents of the fields to zBus
+        // on Enter, send the contents of the fields to zBus
         case '\r':
         case '\n':
         case KEY_ENTER:
@@ -923,7 +952,7 @@ Context ZBusCli::handle_send_input(int input, Context context)
             form_driver(p->entry_form, REQ_DEL_PREV);
             break;
 
-            // on Escape, determine whether or not this is the beginning of an "Escape Sequence"
+        // on Escape, determine whether or not this is the beginning of an "Escape Sequence"
         case '\033':
             input = wgetch(p->entry.window);
 
@@ -988,7 +1017,7 @@ Context ZBusCli::handle_peruse_input(int input, Context context)
                 context.mode = Mode::Command;
                 context.selection = -1;
                 return handle_command_input(input, context);
-        }
+            }
 
 
             // if the event history is empty, ignore selections
