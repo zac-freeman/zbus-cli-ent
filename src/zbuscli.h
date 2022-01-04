@@ -44,6 +44,7 @@ public:
 
 signals:
     void event_submitted(const ZBusEvent &event);
+    void quit();
 
 private slots:
     void retry_connection();

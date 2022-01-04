@@ -72,6 +72,10 @@ int main(int argc, char **argv)
   }
 
   ZBusCli zBusCli;
+
+  // quit application when zBusCli emits quit signal
+  QObject::connect(&zBusCli, &ZBusCli::quit, &app, &QCoreApplication::quit);
+
   zBusCli.exec(zBusUrl);
   return app.exec();
 }
