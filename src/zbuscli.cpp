@@ -43,8 +43,8 @@ static const QMap<Direction, QString> direction_sign
 // Maps each mode to the corresponding help text to be displayed.
 static const QMap<Mode, QString> help_text
 {
-    { Mode::Command, "Esc) back, q) quit, s) begin send mode, p) begin peruse mode, "
-                     "m) toggle pinpad simulator" },
+    { Mode::Command, "Esc) back, m) toggle pinpad simulator, s) begin send mode, "
+                     "p) begin peruse mode, q) quit" },
     { Mode::Send, "Esc) back, Tab) switch field, Enter) send event" },
     { Mode::Peruse, "Esc) back" }
 };
@@ -887,6 +887,12 @@ Context ZBusCli::handle_command_input(int input, Context context)
                 return context;
             }
 
+        // On "m", toggle the pinpad simulator:
+        case 'm':
+            context.pinpad_simulated = !context.pinpad_simulated;
+            p->pinpad_simulated = context.pinpad_simulated;
+            return context;
+
         // On "s", switch to send mode and reset the mock menu window
         case 's':
             context.mode = Mode::Send;
@@ -897,12 +903,6 @@ Context ZBusCli::handle_command_input(int input, Context context)
         case 'p':
             context.mode = Mode::Peruse;
             context.menu = Menu::Main;
-            return context;
-
-        // On "m", toggle the pinpad simulator:
-        case 'm':
-            context.pinpad_simulated = !context.pinpad_simulated;
-            p->pinpad_simulated = context.pinpad_simulated;
             return context;
 
         // On "q", quit the application
