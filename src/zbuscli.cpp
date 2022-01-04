@@ -618,7 +618,7 @@ ZBusCli::ZBusCli(QObject *parent) : QObject(parent)
     p = new ZBusCliPrivate();
 
     connect(&p->client, &ZWebSocket::disconnected,
-            this, &ZBusCli::onDisconnected);
+            this, &ZBusCli::retry_connection);
     connect(this, &ZBusCli::event_submitted,
             this, &ZBusCli::handle_outbound_event);
     connect(&p->client, &ZWebSocket::zBusEventReceived,
@@ -649,7 +649,7 @@ void ZBusCli::exec(const QUrl &zBusUrl)
 /* \brief Attempts to connect to zBus after a delay. This is connected to ZWebSocket's disconnected
  *        signal to enable retries.
  */
-void ZBusCli::onDisconnected()
+void ZBusCli::retry_connection()
 {
     QUrl zBusUrl = p->client.requestUrl();
     QTimer::singleShot(RETRY_DELAY_MS, [this, zBusUrl] {p->client.open(zBusUrl);});

@@ -46,7 +46,7 @@ signals:
     void event_submitted(const ZBusEvent &event);
 
 private slots:
-    void onDisconnected();
+    void retry_connection();
     qint64 handle_outbound_event(const ZBusEvent &event);
     void handle_inbound_event(const ZBusEvent &event);
 
