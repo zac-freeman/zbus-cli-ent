@@ -43,12 +43,12 @@ public:
     Context handle_send_input(int input, Context context);
 
 signals:
-    void eventSubmitted(const ZBusEvent &event);
+    void event_submitted(const ZBusEvent &event);
 
 private slots:
     void onDisconnected();
-    qint64 onEventSubmitted(const ZBusEvent &event);
-    void onZBusEventReceived(const ZBusEvent &event);
+    qint64 handle_outbound_event(const ZBusEvent &event);
+    void handle_inbound_event(const ZBusEvent &event);
 
 private:
     ZBusCliPrivate *p;

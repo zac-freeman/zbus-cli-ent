@@ -28,16 +28,16 @@ static const int INPUT_WAIT_DS = 1;
 static const int GREEN_TEXT = 1;
 static const int RED_TEXT = 2;
 
-/* Origin of events stored in zBus event history. All the events are either received from the zBus
- * server, or sent to the zBus server.
+/* Direction (or origin) of events stored in zBus event history. All the events are either received
+ * from the zBus server (inbound), or sent to the zBus server (outbound).
  */
-enum class Origin { Received, Sent };
+enum class Direction { Inbound, Outbound };
 
-// Provides a visual indicator for the origin of an event.
-static const QMap<Origin, QString> origin_sign
+// Provides a visual indicator for the direction of an event.
+static const QMap<Direction, QString> direction_sign
 {
-    { Origin::Received, "-> " },
-    { Origin::Sent, "<- " }
+    { Direction::Inbound, "-> " },
+    { Direction::Outbound, "<- " }
 };
 
 // Maps each mode to the corresponding help text to be displayed.
@@ -202,11 +202,11 @@ struct META_WINDOW
 class ZBusCliPrivate
 {
 public:
-    QList<QPair<Origin, ZBusEvent>> event_history;  // list of all events to and from zBus
-    QString current_request_id;                     // last requestId received from zBus event
-    QString current_auth_attempt_id;                // last authAttemptId received from zBus event
-    bool pinpad_simulated;                          // simulates affirmative responses from pinpad
-    ZWebSocket client;                              // sender and receiver of zBus events
+    QList<QPair<Direction, ZBusEvent>> event_history; // list of all events to and from zBus
+    QString current_request_id;                       // last requestId received from zBus event
+    QString current_auth_attempt_id;                  // last authAttemptId received from zBus event
+    bool pinpad_simulated;                            // simulates affirmative responses from pinpad
+    ZWebSocket client;                                // sender and receiver of zBus events
 
     FIELD *entry_fields[3] = {};
     FORM *entry_form = nullptr;
@@ -499,8 +499,8 @@ public:
         QQueue<int> event_heights;
         for (int i = current_top; i >= next_selection; i--)
         {
-            QPair<Origin, ZBusEvent> event = event_history.at(i);
-            QString prefix = origin_sign.value(event.first);
+            QPair<Direction, ZBusEvent> event = event_history.at(i);
+            QString prefix = direction_sign.value(event.first);
             QString json = event.second.toJson();
             int height = ((prefix.size() + json.size() - 1) / columns) + 1;
             event_heights.enqueue(height);
@@ -553,8 +553,8 @@ public:
             // determine the height (due to line-wrapping) of the next event to be written;
             // if the event would extend past the end of the history.window,
             // do not display that event or any subsequent events
-            QPair<Origin, ZBusEvent> event = event_history.at(i);
-            QString prefix = origin_sign.value(event.first);
+            QPair<Direction, ZBusEvent> event = event_history.at(i);
+            QString prefix = direction_sign.value(event.first);
             QString json = event.second.toJson();
             int height = ((prefix.size() + json.size() - 1) / columns) + 1;
             if (row + height > rows)
@@ -619,10 +619,10 @@ ZBusCli::ZBusCli(QObject *parent) : QObject(parent)
 
     connect(&p->client, &ZWebSocket::disconnected,
             this, &ZBusCli::onDisconnected);
-    connect(this, &ZBusCli::eventSubmitted,
-            this, &ZBusCli::onEventSubmitted);
+    connect(this, &ZBusCli::event_submitted,
+            this, &ZBusCli::handle_outbound_event);
     connect(&p->client, &ZWebSocket::zBusEventReceived,
-            this, &ZBusCli::onZBusEventReceived);
+            this, &ZBusCli::handle_inbound_event);
 }
 
 /* \brief Cleans up the PIMPL object.
@@ -655,21 +655,18 @@ void ZBusCli::onDisconnected()
     QTimer::singleShot(RETRY_DELAY_MS, [this, zBusUrl] {p->client.open(zBusUrl);});
 }
 
-/* \brief Constructs a ZBusEvent from the given event string and data string, sends it to zBus, and
- *        stores a copy in the event_history list.
+/* \brief Sends the given event to zBus, and stores a copy in the event_history list.
  *
- *        This is connected to the eventSubmitted signal that is emitted from the ncurses event loop
- *        to enable sending events from the text-based UI.
+ *        This is connected to the event_submitted signal that is emitted from the ncurses event
+ *        loop to enable sending events from the text-based UI.
  *
- * \param <event> String containing the event sender and event type.
- * \param <data> String containing the event data.
- * \param <requestId> String containing the requestId of the event.
+ * \param <event> The zBus event to record and send.
  *
  * \returns Number of bytes sent.
  */
-qint64 ZBusCli::onEventSubmitted(const ZBusEvent &event)
+qint64 ZBusCli::handle_outbound_event(const ZBusEvent &event)
 {
-    p->event_history.append({ Origin::Sent, event });
+    p->event_history.append({ Direction::Outbound, event });
     return p->client.sendZBusEvent(event);
 }
 
@@ -682,9 +679,9 @@ qint64 ZBusCli::onEventSubmitted(const ZBusEvent &event)
  *
  * \param <event> Event received from zBus.
  */
-void ZBusCli::onZBusEventReceived(const ZBusEvent &event)
+void ZBusCli::handle_inbound_event(const ZBusEvent &event)
 {
-    p->event_history.append({Origin::Received, event});
+    p->event_history.append({Direction::Inbound, event});
 
     // if the received event contains a requestId,
     // update the stored requestId for mock events
@@ -709,9 +706,9 @@ void ZBusCli::onZBusEventReceived(const ZBusEvent &event)
                         || response == Mock::PinpadCardInfo) ? 5000 : 100;
             QTimer::singleShot(
                     timeout,
-                    [this, response] { onEventSubmitted({ response,
-                                                        p->current_request_id,
-                                                        p->current_auth_attempt_id });});
+                    [this, response] { handle_outbound_event({ response,
+                                                               p->current_request_id,
+                                                               p->current_auth_attempt_id });});
         }
     }
 }
@@ -915,9 +912,9 @@ Context ZBusCli::handle_send_input(int input, Context context)
         case '\n':
         case KEY_ENTER:
             form_driver(p->entry_form, REQ_VALIDATION);
-            emit eventSubmitted({ field_buffer(p->entry_fields[0], 0),
-                    field_buffer(p->entry_fields[2], 0),
-                    field_buffer(p->entry_fields[1], 0) });
+            emit event_submitted({ field_buffer(p->entry_fields[0], 0),
+                                   field_buffer(p->entry_fields[2], 0),
+                                   field_buffer(p->entry_fields[1], 0) });
             break;
 
         // on Backspace, backspace
