@@ -138,6 +138,7 @@ static const QMap<Menu, QVector<MockMenuEntry>> mock_menu_entries
         Menu::PinpadPayment,
         {
             { "finish transaction", Mock::PinpadFinishPaymentRequest },
+            { "partial approval", Mock::PinpadPartialApproval },
             { "payment accepted", Mock::PinpadPaymentAccepted },
             { "back", Menu::Pinpad }
         }
@@ -788,7 +789,7 @@ void ZBusCli::handle_input(Context current)
         p->resize_history_window(next.mode);
     }
 
-    // the event selection has changed, if any new events have been received, or the mode has
+    // if the event selection has changed, any new events have been received, or the mode has
     // changed, update the event history
     next.size = p->event_history.size();
     if (next.selection != current.selection ||
@@ -1040,10 +1041,6 @@ Context ZBusCli::handle_peruse_input(int input, Context context)
                     context.selection = context.selection > 0 ? context.selection - 1 : latest_event;
                     return context;
             }
-
-            // on any other escape sequence, do nothing
-            // TODO: replace with default case, remove mixing of breaks and returns
-            break;
     }
 
     // on any other input, do nothing

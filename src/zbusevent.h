@@ -23,6 +23,7 @@ enum class Mock
     PinpadDisplayItemFailure,
     PinpadDisplayItemSuccess,
     PinpadFinishPaymentRequest,
+    PinpadPartialApproval,
     PinpadPaymentAccepted,
 
     // printer events

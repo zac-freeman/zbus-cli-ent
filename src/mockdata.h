@@ -31,6 +31,12 @@ static const QJsonObject MOCK_CARD_INFO
 
 static const QString MOCK_CUSTOMER_INFO{ "{receiptPreference: 'PAPER'}" };
 
+static const QJsonObject MOCK_PARTIAL_APPROVAL
+{
+    { "authorizedAmount", "610" },
+    { "requestedAmount", "960" }
+};
+
 static const QJsonObject MOCK_DRAWER_OPEN_STATE
 {
     { "tillIsConnected", true },

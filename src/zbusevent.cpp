@@ -28,6 +28,7 @@ static const QMap<Mock, ZBusEvent> mockEvent
     { Mock::PinpadDisplayItemFailure, { "pinpad.displayItemFailure" } },
     { Mock::PinpadDisplayItemSuccess, { "pinpad.displayItemSuccess" } },
     { Mock::PinpadFinishPaymentRequest, { "pinpad.finishPaymentRequest" } },
+    { Mock::PinpadPartialApproval, { "pinpad.partialApprovalAuthorized", MOCK_PARTIAL_APPROVAL } },
     { Mock::PinpadPaymentAccepted, { "pinpad.paymentAccepted", MOCK_CARD_INFO } },
 
     // printer events
