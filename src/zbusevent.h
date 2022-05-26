@@ -5,6 +5,8 @@
 #include <QJsonObject>
 #include <QString>
 
+struct DomainAndType;
+
 /* Mock event types. For each value, there is a corresponding event that mocks some event from a
  * hardware device.
  */
@@ -44,7 +46,7 @@ enum class Mock
  * respectively. The shape of a zBus event is:
  *  ```
  *  {
- *      "event": "<sender>.<type>",
+ *      "event": "<domain>.<type>",
  *      "data": <json array or object>,
  *      "requestId": "<requestId>"
  *  }
@@ -65,7 +67,7 @@ public:
     QString name() const;
     QString dataString() const;
 
-    QString sender;
+    QString domain;
     QString type;
     QJsonValue data;
     QString requestId;

@@ -7,6 +7,26 @@
 #include <QStringList>
 #include <QVariant>
 
+struct DomainAndType
+{
+    QString domain;
+    QString type;
+};
+
+/* \brief Extracts the domain and type from a given event into a struct.
+ *
+ *        The event name for a zBus event takes the form of "<domain>.<type>". However, in some
+ *        cases, a domain can contain subdomains, giving event names like
+ *        "pinpad.manager.updateFirmware".
+ */
+static DomainAndType extractDomainAndType(const QString &event)
+{
+    QStringList domainAndType = event.trimmed().split(".");
+    QString domain = domainAndType.mid(0, domainAndType.size() - 1).join('.');
+    QString type = domainAndType.value(domainAndType.size() - 1);
+    return {domain, type};
+}
+
 /* Mocked hardware events, corresponding to specific hardware events/behaviors named in the `Mock`
  * enum.
  */
@@ -49,16 +69,16 @@ static const QMap<Mock, ZBusEvent> mockEvent
  */
 ZBusEvent::ZBusEvent(const QJsonObject &json)
 {
-    QStringList senderAndType = json.value("event").toString().split(".");
-    this->sender = senderAndType.value(0);
-    this->type = senderAndType.value(1);
+    DomainAndType domainAndType = extractDomainAndType(json.value("event").toString());
+    this->domain = domainAndType.domain;
+    this->type = domainAndType.type;
     this->data = json.value("data");
     this->requestId = json.value("requestId").toString();
 }
 
 /* \brief Constructs a ZBusEvent from the given event string and data string.
  *
- * \param <event> String containing the event sender and type in the format "sender.type".
+ * \param <event> String containing the event domain and type in the format "domain.type".
  *                Corresponds to the "event" field in the JSON representation of a zBus event.
  * \param <data> JSON value containing the event data.
  * \param <requestId> String ID of the pinpad request this event corresponds to.
@@ -67,9 +87,9 @@ ZBusEvent::ZBusEvent(const QString &event,
                      const QJsonValue &data,
                      const QString &requestId)
 {
-    QStringList senderAndType = event.trimmed().split(".");
-    this->sender = senderAndType.value(0);
-    this->type = senderAndType.value(1);
+    DomainAndType domainAndType = extractDomainAndType(event);
+    this->domain = domainAndType.domain;
+    this->type = domainAndType.type;
     this->requestId = requestId.trimmed();
 
     // if the data is a string, attempt to convert it into an object or array;
@@ -90,7 +110,7 @@ ZBusEvent::ZBusEvent(const QString &event,
  *        adds the provided `requestId` and `authAttemptId` to the mocked event to associate said
  *        event with a real transaction.
  *
- * \param <Mock> Event type to determine the type, sender, and data.
+ * \param <Mock> Event type to determine the type, domain, and data.
  * \param <requestId> String ID of the pinpad request this event corresponds to.
  * \param <authAttemptId> String ID of the pinpad payment authorization this event corresponds to.
  */
@@ -98,7 +118,7 @@ ZBusEvent::ZBusEvent(enum Mock name,
                      const QString &requestId,
                      const QString &authAttemptId)
 {
-    this->sender = mockEvent[name].sender;
+    this->domain = mockEvent[name].domain;
     this->type = mockEvent[name].type;
     this->data = mockEvent[name].data;
     this->requestId = requestId;
@@ -124,13 +144,13 @@ QString ZBusEvent::toJson() const
     return QJsonDocument(json).toJson(QJsonDocument::Compact);
 }
 
-/* \brief Assembles the event name from the sender and type.
+/* \brief Assembles the event name from the domain and type.
  *
  * \returns The event name of the ZBusEvent.
  */
 QString ZBusEvent::name() const
 {
-    return sender + ((sender.isEmpty() || type.isEmpty()) ? "" : ".") + type;
+    return domain + ((domain.isEmpty() || type.isEmpty()) ? "" : ".") + type;
 }
 
 /* \brief Creates a JSON-formatted string from the event data.
